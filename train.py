@@ -247,6 +247,8 @@ def set_config(args):
     config.model_load_epoch = args.model_load_epoch
     config.begin_epoch = args.begin_epoch
     config.num_epoch = args.num_epoch
+    if config.num_epoch == 90:
+        config.lr_step = [36, 60, 80]
     config.lr = args.lr
     config.lr_scheduler = args.lr_scheduler
     config.optimizer = args.optimizer
