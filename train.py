@@ -3,7 +3,6 @@ import argparse
 # import config
 from config.edict_config import config
 import mxnet as mx
-from core.scheduler import multi_factor_scheduler
 from core.solver import Solver
 from core.memonger_v2 import search_plan_to_layer
 from core.callback import DetailSpeedometer
@@ -11,14 +10,16 @@ from data import *
 from symbol import *
 import datetime
 import pprint
-from core.scheduler import WarmupMultiFactorScheduler
-
+import horovod.mxnet as hvd
 
 def main(config):
     # log file
     log_dir = "./log"
     if not os.path.exists(log_dir):
-        os.mkdir(log_dir)
+        try:
+            os.mkdir(log_dir)
+        except Exception as e:
+            print("Can't create directory: %s, maybe other worker created!" % log_dir)
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s %(name)s %(levelname)s %(message)s',
                         datefmt='%m-%d %H:%M',
@@ -32,11 +33,25 @@ def main(config):
     # model folder
     model_dir = "./model"
     if not os.path.exists(model_dir):
-        os.mkdir(model_dir)
+        try:
+            os.mkdir(model_dir)
+        except Exception as e:
+            print("Can't create directory: %s, maybe other worker created!" % model_dir)
 
     # set up environment
-    devs = [mx.gpu(int(i)) for i in config.gpu_list]
-    kv = mx.kvstore.create(config.kv_store)
+    if config.use_horovod == 1:
+        print("--------------- using horovod to update parameters ---------------------")
+        # Initialize Horovod
+        hvd.init()
+        devs = mx.cpu() if args.gpus is None or args.gpus == '-1' else mx.gpu(hvd.local_rank())
+        num_workers = hvd.size()
+        rank = hvd.rank()
+    else:
+        kv = mx.kvstore.create(config.kv_store)
+        devs = mx.cpu() if args.gpus is None or args.gpus == '-1' else [mx.gpu(int(i)) for i in config.gpu_list]
+        num_workers = kv.num_workers
+        rank = kv.rank
+
 
     # set up iterator and symbol
     # iterator
@@ -49,16 +64,16 @@ def main(config):
     # elif config.use_dali_iter is True:
     #     train, val, num_examples = get_dali_iter(data_dir=config.data_dir,
     #                                              batch_size=config.batch_size,
-    #                                              kv=kv,
     #                                              image_shape=tuple(config.image_shape),
     #                                              num_gpus=len(devs))
     else:
         train, val, num_examples = imagenet_iterator(data_dir=config.data_dir,
                                                      batch_size=config.batch_size,
-                                                     kv=kv,
+                                                     num_workers=num_workers,
+                                                     rank=rank,
                                                      image_shape=tuple(config.image_shape))
-    print train
-    print val
+    print(train)
+    print(val)
     data_names = ('data',)
     label_names = ('softmax_label',)
     data_shapes = [('data', tuple([config.batch_size] + config.image_shape))]
@@ -104,7 +119,7 @@ def main(config):
 
         # if config.network == 'resnet':
         #     last_block = 'conv3_1_relu'
-        #     if kv.rank == 0:
+        #     if rank == 0:
         #         print("resnet do memonger up to {}".format(last_block))
         # else:
         #     last_block = None
@@ -113,41 +128,36 @@ def main(config):
         symbol = search_plan_to_layer(symbol, last_block, 1000, type_dict=input_dtype, **per_gpu_data_shape_dict)
 
     # train
-    epoch_size = max(int(num_examples / config.batch_size / kv.num_workers), 1)
-    if 'dist' in config.kv_store and not 'async' in config.kv_store \
-            and config.use_multiple_iter is False and config.use_dali_iter is False:
+    epoch_size = max(int(num_examples / config.batch_size / num_workers), 1)
+    if num_workers > 1 and config.use_multiple_iter is False and config.use_dali_iter is False :
         logging.info('Resizing training data to %d batches per machine', epoch_size)
         # resize train iter to ensure each machine has same number of batches per epoch
         # if not, dist_sync can hang at the end with one machine waiting for other machines
         train = mx.io.ResizeIter(train, epoch_size)
 
-    if config.warmup is not None and config.warmup is True:
-        lr_epoch = [int(epoch) for epoch in config.lr_step]
-        lr_epoch_diff = [epoch - config.begin_epoch for epoch in lr_epoch if epoch > config.begin_epoch]
-        lr = config.lr * (config.lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
-        lr_iters = [int(epoch * epoch_size) for epoch in lr_epoch_diff]
-        print 'warmup lr', config.warmup_lr, 'warm_epoch', config.warm_epoch, 'warm_step', int(config.warm_epoch * epoch_size)
-
-        if config.lr_scheduler == 'poly':
-            print 'PolyScheduler lr', lr
-            lr_scheduler = mx.lr_scheduler.PolyScheduler(int(epoch_size*config.num_epoch), base_lr=lr, pwr=2, final_lr=0,
-                                                         warmup_steps=int(config.warm_epoch * epoch_size),
-                                                         warmup_begin_lr=0, warmup_mode='linear')
-        else:
-            print 'WarmupMultiFactorScheduler lr', lr, 'lr_epoch_diff', lr_epoch_diff, 'lr_iters', lr_iters
-            lr_scheduler = WarmupMultiFactorScheduler(base_lr=lr, step=lr_iters, factor=config.lr_factor,
-                                                  warmup=True, warmup_type='gradual',
-                                                  warmup_lr=config.warmup_lr, warmup_step=int(config.warm_epoch * epoch_size))
-    elif config.lr_step is not None:
-        lr_scheduler = multi_factor_scheduler(config.begin_epoch, epoch_size, step=config.lr_step,
-                                              factor=config.lr_factor)
+    lr_epoch = [int(epoch) for epoch in config.lr_step]
+    lr_epoch_diff = [epoch - config.begin_epoch for epoch in lr_epoch if epoch > config.begin_epoch]
+    lr = config.lr * (config.lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
+    if config.lr_scheduler == 'Poly':
+        print("using PolyScheduler, the scheduler don't support resume")
+        lr_scheduler = mx.lr_scheduler.PolyScheduler(int(epoch_size * config.num_epoch), base_lr=lr, pwr=2, final_lr=0,
+                                                     warmup_mode='linear',
+                                                     warmup_begin_lr=0,
+                                                     warmup_steps=int(config.warm_epoch * epoch_size))
     else:
-        lr_scheduler = None
+        lr_iters = [int(epoch * epoch_size) for epoch in lr_epoch_diff]
+        print('using MultiFactorScheduler warmup lr', config.warmup_lr, 'warm_epoch', config.warm_epoch, \
+              'warm_step', int(config.warm_epoch * epoch_size))
+        lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(base_lr=lr, step=lr_iters, factor=config.lr_factor,
+                                            warmup_mode='linear',
+                                            warmup_begin_lr=config.warmup_lr,
+                                            warmup_steps=int(config.warm_epoch * epoch_size))
 
     optimizer_params = {
         'learning_rate': lr,
         'wd': config.wd,
         'lr_scheduler': lr_scheduler,
+        'rescale_grad': 1.0 / config.batch_size / num_workers,
         'multi_precision': config.multi_precision}
     # Only a limited number of optimizers have 'momentum' property
     has_momentum = {'sgd', 'dcasgd', 'nag', 'signum', 'lbsgd'}
@@ -181,28 +191,54 @@ def main(config):
                     label_shapes=label_shapes,
                     logger=logging,
                     context=devs)
-    epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.model_prefix)
+    # epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.model_prefix)
+    epoch_end_callback = _save_model("./model/" + config.model_prefix, rank)
     batch_end_callback = mx.callback.Speedometer(config.batch_size, config.frequent)
     # batch_end_callback = DetailSpeedometer(config.batch_size, config.frequent)
     initializer = mx.init.Xavier(rnd_type='gaussian', factor_type='in', magnitude=2)
     arg_params = None
     aux_params = None
-    if config.retrain:
-        _, arg_params, aux_params = mx.model.load_checkpoint("model/{}".format(config.model_load_prefix),
-                                                             config.model_load_epoch)
-    solver.fit(train_data=train,
-               eval_data=val,
-               eval_metric=eval_metric,
-               epoch_end_callback=epoch_end_callback,
-               batch_end_callback=batch_end_callback,
-               initializer=initializer,
-               arg_params=arg_params,
-               aux_params=aux_params,
-               optimizer=config.optimizer,
-               optimizer_params=optimizer_params,
-               begin_epoch=config.begin_epoch,
-               num_epoch=config.num_epoch,
-               kvstore=kv)
+    if config.model_load_epoch > 0:
+        _, arg_params, aux_params = _load_model("./model/" + config.model_prefix, config.model_load_epoch)
+
+    if config.use_horovod == 1:
+        opt = mx.optimizer.create(config.optimizer, sym=symbol, **optimizer_params)
+        opt = hvd.DistributedOptimizer(opt)
+        hvd.barrier()
+        if arg_params is not None:
+            hvd.broadcast_parameters(arg_params, root_rank=0)
+        if aux_params is not None:
+            hvd.broadcast_parameters(aux_params, root_rank=0)
+        mx.nd.waitall()
+        solver.fit(train_data=train,
+                   eval_data=val,
+                   eval_metric=eval_metric,
+                   epoch_end_callback=epoch_end_callback,
+                   batch_end_callback=batch_end_callback,
+                   initializer=initializer,
+                   arg_params=arg_params,
+                   aux_params=aux_params,
+                   optimizer=opt,
+                   optimizer_params=optimizer_params,
+                   begin_epoch=config.begin_epoch,
+                   num_epoch=config.num_epoch,
+                   kvstore=None,
+                   rank=rank)
+    else:
+        solver.fit(train_data=train,
+                   eval_data=val,
+                   eval_metric=eval_metric,
+                   epoch_end_callback=epoch_end_callback,
+                   batch_end_callback=batch_end_callback,
+                   initializer=initializer,
+                   arg_params=arg_params,
+                   aux_params=aux_params,
+                   optimizer=config.optimizer,
+                   optimizer_params=optimizer_params,
+                   begin_epoch=config.begin_epoch,
+                   num_epoch=config.num_epoch,
+                   kvstore=kv,
+                   rank=rank)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train Faster R-CNN network')
@@ -216,8 +252,10 @@ def parse_args():
     parser.add_argument('--resume', help='continue training', action='store_true')
     parser.add_argument('--gpus', help='GPU device to train with', default='-1', type=str)
     parser.add_argument('--model_prefix', help='pretrained model prefix', default=config.model_prefix, type=str)
-    parser.add_argument('--model_load_epoch', help='pretrained model epoch', default=config.model_load_epoch, type=int)
-    parser.add_argument('--begin_epoch', help='begin epoch of training, use with resume', default=config.begin_epoch, type=int)
+    parser.add_argument('--model_load_epoch', help='pretrained model epoch',
+                        default=config.model_load_epoch, type=int)
+    parser.add_argument('--begin_epoch', help='begin epoch of training, use with resume',
+                        default=config.begin_epoch, type=int)
     parser.add_argument('--num_epoch', help='end epoch of training', default=config.num_epoch, type=int)
     parser.add_argument('--lr', help='base learning rate', default=config.lr, type=float)
     parser.add_argument('--lr_scheduler', help='lr scheduler', default=config.lr_scheduler, type=str)
@@ -225,11 +263,24 @@ def parse_args():
     parser.add_argument('--data_type', help='data type', default=config.data_type, type=str)
     parser.add_argument('--grad_scale', help='grad scale for fp16', default=config.grad_scale, type=float)
     parser.add_argument('--batch_per_gpu', help='batch size per gpu', default=config.batch_per_gpu, type=int)
+    parser.add_argument('--batch_size', help='batch size for cpu', default=-1, type=int)
     # memory
-    parser.add_argument('--memonger', help='use memonger to put more images on a single GPU', default=config.memonger, type=int)
+    parser.add_argument('--memonger', help='use memonger to put more images on a single GPU',
+                        default=config.memonger, type=int)
     parser.add_argument('--lars_eta', help='lars eta', default=config.lars_eta, type=float)
     parser.add_argument('--isdebug', help='debug to check lars', default=config.isdebug, type=int)
     parser.add_argument('--islars', help='do lars', default=config.islars, type=int)
+
+    parser.add_argument('--data_nthreads', help='the number of thread for data augmentation',
+                        default=config.data_nthreads, type=int)
+    parser.add_argument('--benchmark', help='train without dataset',
+                        default=config.benchmark, type=int)
+    parser.add_argument('--warmup_lr', help='the begining lr during warmup',
+                        default=config.warmup_lr, type=float)
+    parser.add_argument('--warm_epoch', help='the epoch of warmup stage',
+                        default=config.warm_epoch, type=int)
+    parser.add_argument('--use_horovod', help='the flag of using horovod',
+                        default=config.use_horovod, type=int)
     args = parser.parse_args()
     return args
 
@@ -239,8 +290,6 @@ def set_config(args):
     config.data_dir = args.data_dir
     config.frequent = args.frequent
     config.kv_store = args.kv_store
-    if args.resume:
-        config.retrain = True
     if args.gpus != '-1':
         config.gpu_list = [int(devs_id) for devs_id in args.gpus.split(',')]
     config.model_prefix = args.model_prefix
@@ -255,16 +304,43 @@ def set_config(args):
     config.data_type = args.data_type
     config.grad_scale = args.grad_scale
     config.batch_per_gpu = args.batch_per_gpu
-    config.batch_size = config.batch_per_gpu * len(config.gpu_list)
+    if args.batch_size != -1:
+        config.batch_size  =args.batch_size
+    else:
+        config.batch_size = config.batch_per_gpu * len(config.gpu_list)
     config.memonger = args.memonger
     config.lars_eta = args.lars_eta
     config.isdebug = args.isdebug
     config.islars = args.islars
 
+    config.data_nthreads = args.data_nthreads
+    config.benchmark = args.benchmark
+    config.warmup_lr = args.warmup_lr
+    config.warm_epoch = args.warm_epoch
+
+    config.use_horovod = args.use_horovod
+
+
+def _save_model(model_prefix, rank=0):
+    if model_prefix is None:
+        return None
+    if rank != 0:
+        return None
+    return mx.callback.do_checkpoint(model_prefix if rank == 0 else "%s-%d" % (
+        model_prefix, rank), period=1)
+
+def _load_model(model_prefix, model_load_epoch):
+    if model_load_epoch is None or model_load_epoch < 1:
+        return (None, None, None)
+    assert model_prefix is not None
+    sym, arg_params, aux_params = mx.model.load_checkpoint(
+        model_prefix, model_load_epoch)
+    logging.info('Loaded model %s_%04d.params', model_prefix, model_load_epoch)
+    return (sym, arg_params, aux_params)
 
 if __name__ == '__main__':
     args = parse_args()
-    print 'Called with argument:', args
+    print('Called with argument:', args)
     now = datetime.datetime.now()
     date = '{}_{:0>2}_{:0>2}'.format(now.year, now.month, now.day)
 

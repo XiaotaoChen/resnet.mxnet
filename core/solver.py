@@ -5,7 +5,7 @@ import mxnet as mx
 from mxnet.module import Module
 from mxnet import metric
 #from mxnet.model import BatchEndParam
-from callback import BatchEndParam
+from .callback import BatchEndParam
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -61,7 +61,7 @@ class Solver(object):
             aux_params=None, allow_missing=False,
             optimizer=None, optimizer_params=None,
             begin_epoch=0, num_epoch=None,
-            kvstore='device'):
+            kvstore=None, rank=0):
 
         self.module.bind(data_shapes=self.data_shapes, label_shapes=self.label_shapes, for_training=True)
         self.module.init_params(initializer=initializer,
@@ -135,7 +135,7 @@ class Solver(object):
                     batch_end_params = BatchEndParam(epoch=epoch, nbatch=nbatch,
                                                      eval_metric=eval_metric,
                                                      locals=locals(),
-                                                     rank=kvstore.rank, total_iter=temp_count,
+                                                     rank=rank, total_iter=temp_count,
                                                      cur_data_time=get_data_time.val, avg_data_time=get_data_time.avg,
                                                      cur_batch_time=train_time.val, avg_batch_time=train_time.avg,
                                                      cur_kvstore_sync_time=kvstore_sync_time.val,
@@ -156,7 +156,7 @@ class Solver(object):
             arg_params, aux_params = self.module.get_params()
             self.module.set_params(arg_params, aux_params)
 
-            if epoch_end_callback is not None and kvstore.rank == 0:
+            if epoch_end_callback is not None and rank == 0:
                 for callback in _as_list(epoch_end_callback):
                     callback(epoch, self.symbol, arg_params, aux_params)
             if eval_data:

@@ -53,7 +53,7 @@ class  HybridValPipe (Pipeline):
         return [output, self.labels]
 
 
-def get_dali_iter(data_dir, batch_size, kv, image_shape, num_gpus):
+def get_dali_iter(data_dir, batch_size, image_shape, num_gpus):
     num_examples = 1281167
     trainpipes = [HybridTrainPipe(batch_size=batch_size//num_gpus, num_threads=2, device_id=i, num_gpus=num_gpus, db_folder=data_dir) for i in range(num_gpus)]
     valpipes = [HybridValPipe(batch_size=batch_size//num_gpus, num_threads=2, device_id=i, num_gpus=num_gpus, db_folder=data_dir) for i in range(num_gpus)]
