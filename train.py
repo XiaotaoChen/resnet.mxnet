@@ -67,11 +67,16 @@ def main(config):
     #                                              image_shape=tuple(config.image_shape),
     #                                              num_gpus=len(devs))
     else:
-        train, val, num_examples = imagenet_iterator(data_dir=config.data_dir,
-                                                     batch_size=config.batch_size,
-                                                     num_workers=num_workers,
-                                                     rank=rank,
-                                                     image_shape=tuple(config.image_shape))
+        train, val, num_examples = get_data_rec(data_dir=config.data_dir,
+                                                batch_size=config.batch_size,
+                                                data_nthreads=config.data_nthreads,
+                                                num_workers=num_workers,
+                                                rank=rank)
+        # train, val, num_examples = imagenet_iterator(data_dir=config.data_dir,
+        #                                              batch_size=config.batch_size,
+        #                                              num_workers=num_workers,
+        #                                              rank=rank,
+        #                                              image_shape=tuple(config.image_shape))
     print(train)
     print(val)
     data_names = ('data',)

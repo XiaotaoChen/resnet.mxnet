@@ -150,67 +150,39 @@ def imagenet_iterator(data_dir, batch_size, num_workers, rank, image_shape):
         train = SyntheticDataIter(config.num_classes, data_shape, 5005, np.float32)
         return (train, None, num_examples)
 
-    # train = mx.io.ImageRecordIter(
-    #         path_imgrec         = os.path.join(data_dir, "train.rec"),
-    #         label_width         = 1,
-    #         data_name           = 'data',
-    #         label_name          = 'softmax_label',
-    #         data_shape          = image_shape,
-    #         batch_size          = batch_size,
-    #         pad                 = 0,
-    #         fill_value          = 127,
-    #         random_resized_crop = True,
-    #         max_random_area     = 1.0,
-    #         min_random_area     = 0.08,
-    #         max_aspect_ratio    = 4.0 / 3.0,
-    #         min_aspect_ratio    = 3.0 / 4.0,
-    #         brightness          = 0.4,
-    #         contrast            = 0.4,
-    #         saturation          = 0.4,
-    #         mean_r              = 123.68,
-    #         mean_g              = 116.28,
-    #         mean_b              = 103.53,
-    #         std_r               = 58.395,
-    #         std_g               = 57.12,
-    #         std_b               = 57.375,
-    #         pca_noise           = 0.1,
-    #         scale               = 1,
-    #         inter_method        = 2,
-    #         rand_mirror         = True,
-    #         shuffle             = True,
-    #         shuffle_chunk_size  = 4096,
-    #         preprocess_threads  = config.data_nthreads,
-    #         prefetch_buffer     = 16,
-    #         num_parts           = num_workers,
-    #         part_index          = rank)
-    jitter_param = 0.4
-    lighting_param = 0.1
     train = mx.io.ImageRecordIter(
-        path_imgrec=os.path.join(data_dir, "train.rec"),
-        path_imgidx=os.path.join(data_dir, "ILSVRC2012_img_train.idx"),
-        preprocess_threads=config.data_nthreads,
-        shuffle=True,
-        batch_size=batch_size,
-        label_width=1,
-        data_shape=(3, 224, 224),
-        mean_r=123.68,
-        mean_g=116.28,
-        mean_b=103.53,
-        rand_mirror=True,
-        rand_crop=False,
-        random_resized_crop=True,
-        max_aspect_ratio=4. / 3.,
-        min_aspect_ratio=3. / 4.,
-        max_random_area=1,
-        min_random_area=0.08,
-        verbose=False,
-        brightness=jitter_param,
-        saturation=jitter_param,
-        contrast=jitter_param,
-        pca_noise=lighting_param,
-        num_parts=num_workers,
-        part_index=rank
-    )
+            path_imgrec         = os.path.join(data_dir, "train.rec"),
+            label_width         = 1,
+            data_name           = 'data',
+            label_name          = 'softmax_label',
+            data_shape          = image_shape,
+            batch_size          = batch_size,
+            pad                 = 0,
+            fill_value          = 127,
+            random_resized_crop = True,
+            max_random_area     = 1.0,
+            min_random_area     = 0.08,
+            max_aspect_ratio    = 4.0 / 3.0,
+            min_aspect_ratio    = 3.0 / 4.0,
+            brightness          = 0.4,
+            contrast            = 0.4,
+            saturation          = 0.4,
+            mean_r              = 123.68,
+            mean_g              = 116.28,
+            mean_b              = 103.53,
+            std_r               = 58.395,
+            std_g               = 57.12,
+            std_b               = 57.375,
+            pca_noise           = 0.1,
+            scale               = 1,
+            inter_method        = 2,
+            rand_mirror         = True,
+            shuffle             = True,
+            shuffle_chunk_size  = 4096,
+            preprocess_threads  = config.data_nthreads,
+            prefetch_buffer     = 16,
+            num_parts           = num_workers,
+            part_index          = rank)
     val = mx.io.ImageRecordIter(
             path_imgrec         = os.path.join(data_dir, "val.rec"),
             label_width         = 1,
@@ -229,9 +201,7 @@ def imagenet_iterator(data_dir, batch_size, num_workers, rank, image_shape):
             inter_method        = 2,
             rand_crop           = False,
             rand_mirror         = False,
-            preprocess_threads  = config.data_nthreads,
-            num_parts           = num_workers,
-            part_index          = rank)
+            preprocess_threads  = config.data_nthreads)
 
     return train, val, num_examples
 
@@ -261,3 +231,57 @@ def multiple_imagenet_iterator(data_dir, batch_size, num_parts, image_shape, dat
             num_parts           = 1,
             part_index          = 0)
     return train, val, num_examples
+
+
+# Two functions for reading data from record file or raw images
+def get_data_rec(data_dir, batch_size, data_nthreads, num_workers, rank):
+    jitter_param = 0.4
+    lighting_param = 0.1
+    mean_rgb = [123.68, 116.779, 103.939]
+    std_rgb = [58.393, 57.12, 57.375]
+    num_examples = 1281167
+
+    train_data = mx.io.ImageRecordIter(
+        path_imgrec         = os.path.join(data_dir, "train.rec"),
+        path_imgidx         = os.path.join(data_dir, "train.idx"),
+        preprocess_threads  = data_nthreads,
+        shuffle             = True,
+        batch_size          = batch_size,
+        label_width         = 1,
+        data_shape          = (3, 224, 224),
+        mean_r              = mean_rgb[0],
+        mean_g              = mean_rgb[1],
+        mean_b              = mean_rgb[2],
+        rand_mirror         = True,
+        rand_crop           = False,
+        random_resized_crop = True,
+        max_aspect_ratio    = 4. / 3.,
+        min_aspect_ratio    = 3. / 4.,
+        max_random_area     = 1,
+        min_random_area     = 0.08,
+        verbose             = False,
+        brightness          = jitter_param,
+        saturation          = jitter_param,
+        contrast            = jitter_param,
+        pca_noise           = lighting_param,
+        num_parts           = num_workers,
+        part_index          = rank
+    )
+    # kept each node to use full val data to make it easy to monitor results
+    val_data = mx.io.ImageRecordIter(
+        path_imgrec         = os.path.join(data_dir, "val.rec"),
+        path_imgidx         = os.path.join(data_dir, "val.idx"),
+        preprocess_threads  = data_nthreads,
+        shuffle             = False,
+        batch_size          = batch_size,
+        resize              = 256,
+        label_width         = 1,
+        rand_crop           = False,
+        rand_mirror         = False,
+        data_shape          = (3, 224, 224),
+        mean_r              = mean_rgb[0],
+        mean_g              = mean_rgb[1],
+        mean_b              = mean_rgb[2]
+    )
+
+    return train_data, val_data, num_examples
