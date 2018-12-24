@@ -9,7 +9,6 @@ config.dataset = "imagenet"
 config.model_prefix = "resnet50"
 config.network = "resnet"
 config.depth = 50
-config.model_load_epoch = 0
 
 # data
 config.data_dir = '/data/ILSVRC2012'
@@ -27,7 +26,7 @@ if config.dataset == "imagenet":
 else:
     config.lr_step = [120, 160, 240]
 config.lr_factor = 0.1
-config.begin_epoch = config.model_load_epoch
+config.begin_epoch = 0
 config.num_epoch = 90
 config.frequent = 20
 # for distributed training

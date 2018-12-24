@@ -151,8 +151,9 @@ def main(config):
                                                      warmup_steps=int(config.warm_epoch * epoch_size))
     else:
         lr_iters = [int(epoch * epoch_size) for epoch in lr_epoch_diff]
-        print('using MultiFactorScheduler warmup lr', config.warmup_lr, 'warm_epoch', config.warm_epoch, \
-              'warm_step', int(config.warm_epoch * epoch_size))
+        print('using MultiFactorScheduler warmup lr', config.warmup_lr, 'warm_epoch', config.warm_epoch,
+              'warm_step', int(config.warm_epoch * epoch_size), "lr: ", lr, "lr_epoch_diff: ",
+              lr_epoch_diff, "lr_iters: ", lr_iters)
         lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(base_lr=lr, step=lr_iters, factor=config.lr_factor,
                                             warmup_mode='linear',
                                             warmup_begin_lr=config.warmup_lr,
@@ -203,8 +204,8 @@ def main(config):
     initializer = mx.init.Xavier(rnd_type='gaussian', factor_type='in', magnitude=2)
     arg_params = None
     aux_params = None
-    if config.model_load_epoch > 0:
-        _, arg_params, aux_params = _load_model("./model/" + config.model_prefix, config.model_load_epoch)
+    if config.begin_epoch > 0:
+        _, arg_params, aux_params = _load_model("./model/" + config.model_prefix, config.begin_epoch)
 
     if config.use_horovod == 1:
         opt = mx.optimizer.create(config.optimizer, sym=symbol, **optimizer_params)
@@ -257,8 +258,6 @@ def parse_args():
     parser.add_argument('--resume', help='continue training', action='store_true')
     parser.add_argument('--gpus', help='GPU device to train with', default='-1', type=str)
     parser.add_argument('--model_prefix', help='pretrained model prefix', default=config.model_prefix, type=str)
-    parser.add_argument('--model_load_epoch', help='pretrained model epoch',
-                        default=config.model_load_epoch, type=int)
     parser.add_argument('--begin_epoch', help='begin epoch of training, use with resume',
                         default=config.begin_epoch, type=int)
     parser.add_argument('--num_epoch', help='end epoch of training', default=config.num_epoch, type=int)
@@ -298,7 +297,6 @@ def set_config(args):
     if args.gpus != '-1':
         config.gpu_list = [int(devs_id) for devs_id in args.gpus.split(',')]
     config.model_prefix = args.model_prefix
-    config.model_load_epoch = args.model_load_epoch
     config.begin_epoch = args.begin_epoch
     config.num_epoch = args.num_epoch
     if config.num_epoch == 90:
