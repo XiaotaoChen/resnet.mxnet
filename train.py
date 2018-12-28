@@ -52,6 +52,13 @@ def main(config):
         num_workers = kv.num_workers
         rank = kv.rank
 
+    if config.network == 'test_symbol':
+        config.batch_size = 10
+        config.image_shape = (2, 2)
+    data_names = ('data',)
+    label_names = ('softmax_label',)
+    data_shapes = [('data', tuple([config.batch_size] + config.image_shape))]
+    label_shapes = [('softmax_label', (config.batch_size,))]
 
     # set up iterator and symbol
     # iterator
@@ -66,6 +73,8 @@ def main(config):
     #                                              batch_size=config.batch_size,
     #                                              image_shape=tuple(config.image_shape),
     #                                              num_gpus=len(devs))
+    elif config.network == 'test_symbol':
+        train, val, num_examples = get_test_symbol_data(10, config.batch_size, tuple(config.image_shape))
     else:
         train, val, num_examples = get_data_rec(data_dir=config.data_dir,
                                                 batch_size=config.batch_size,
@@ -77,12 +86,9 @@ def main(config):
         #                                              num_workers=num_workers,
         #                                              rank=rank,
         #                                              image_shape=tuple(config.image_shape))
+
     print(train)
     print(val)
-    data_names = ('data',)
-    label_names = ('softmax_label',)
-    data_shapes = [('data', tuple([config.batch_size] + config.image_shape))]
-    label_shapes = [('softmax_label', (config.batch_size,))]
 
     if config.network == 'resnet' or config.network == 'resnet_v1':
         symbol = eval(config.network)(units=config.units,
@@ -111,6 +117,9 @@ def main(config):
                                       bottle_neck=config.bottle_neck)
     elif config.network == 'vgg16' or config.network == 'mobilenet' or config.network == 'shufflenet':
         symbol = eval(config.network)(num_classes=config.num_classes)
+    elif config.network == 'test_symbol':
+        symbol = eval(config.network)(num_classes=config.num_classes)
+
 
     # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
 

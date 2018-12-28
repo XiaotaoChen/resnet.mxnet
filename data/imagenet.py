@@ -285,3 +285,9 @@ def get_data_rec(data_dir, batch_size, data_nthreads, num_workers, rank):
     )
 
     return train_data, val_data, num_examples
+
+def get_test_symbol_data(num_classes, batch_size, image_shape):
+    num_examples = 1281167
+    data_shape = (batch_size,) + image_shape
+    train = SyntheticDataIter(num_classes, data_shape, 100, np.float32)
+    return (train, None, num_examples)
