@@ -55,6 +55,7 @@ def main(config):
     if config.network == 'test_symbol':
         config.batch_size = 10
         config.image_shape = (2, 2)
+        config.num_classes = 2
     data_names = ('data',)
     label_names = ('softmax_label',)
     data_shapes = [('data', tuple([config.batch_size] + config.image_shape))]
@@ -74,7 +75,7 @@ def main(config):
     #                                              image_shape=tuple(config.image_shape),
     #                                              num_gpus=len(devs))
     elif config.network == 'test_symbol':
-        train, val, num_examples = get_test_symbol_data(10, config.batch_size, tuple(config.image_shape))
+        train, val, num_examples = get_test_symbol_data(config.num_classes, config.batch_size, tuple(config.image_shape))
     else:
         train, val, num_examples = get_data_rec(data_dir=config.data_dir,
                                                 batch_size=config.batch_size,
@@ -218,7 +219,7 @@ def main(config):
 
     if config.use_horovod == 1:
         opt = mx.optimizer.create(config.optimizer, sym=symbol, **optimizer_params)
-        opt = hvd.DistributedOptimizer(opt)
+        opt = hvd.DistributedOptimizer(opt, rank)
         hvd.barrier()
         if arg_params is not None:
             hvd.broadcast_parameters(arg_params, root_rank=0)
