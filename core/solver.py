@@ -81,7 +81,8 @@ class Solver(object):
         # training loop
         for epoch in range(begin_epoch, num_epoch):
 
-            train_time = AverageMeter()
+            forward_time = AverageMeter()
+            backward_time = AverageMeter()
             kvstore_sync_time = AverageMeter()
             get_data_time = AverageMeter()
             iter_total_time = AverageMeter()
@@ -92,21 +93,22 @@ class Solver(object):
             data_iter = iter(train_data)
             end_of_batch = False
             next_data_batch = next(data_iter)
-            while not end_of_batch:
-            # while temp_count <= 1000:
-                # ndarray.waitall()
+            # while not end_of_batch:
+            while temp_count <= 1000:
+                mx.ndarray.waitall()
                 start_time = time.time()
                 data_batch = next_data_batch
 
                 self.module.forward(data_batch, is_train=True)
-                self.module.backward()
+                mx.ndarray.waitall()
+                forward_time.update(time.time() - start_time)
 
-                # ndarray.waitall()
-                train_time.update(time.time() - start_time)
+                self.module.backward()
+                mx.ndarray.waitall()
+                backward_time.update(time.time() - start_time)
 
                 self.module.update()
-
-                # ndarray.waitall()
+                mx.ndarray.waitall()
                 kvstore_sync_time.update(time.time() - start_time)
 
                 try:
@@ -114,7 +116,7 @@ class Solver(object):
                 except StopIteration:
                     end_of_batch = True
 
-                # ndarray.waitall()
+                mx.ndarray.waitall()
                 get_data_time.update(time.time() - start_time)
 
                 if isinstance(data_batch, list):
@@ -124,7 +126,7 @@ class Solver(object):
                 else:
                     self.module.update_metric(eval_metric, data_batch.label)
 
-                # ndarray.waitall()
+                mx.ndarray.waitall()
                 iter_total_time.update(time.time() - start_time)
 
                 if batch_end_callback is not None:
@@ -137,7 +139,8 @@ class Solver(object):
                                                      locals=locals(),
                                                      rank=rank, total_iter=temp_count,
                                                      cur_data_time=get_data_time.val, avg_data_time=get_data_time.avg,
-                                                     cur_batch_time=train_time.val, avg_batch_time=train_time.avg,
+                                                     cur_forward_time=forward_time.val, avg_forward_time=forward_time.avg,
+                                                     cur_backward_time=backward_time.val, avg_backward_time=backward_time.avg,
                                                      cur_kvstore_sync_time=kvstore_sync_time.val,
                                                      avg_kvstore_sync_time=kvstore_sync_time.avg,
                                                      cur_iter_total_time=iter_total_time.val,
@@ -148,24 +151,24 @@ class Solver(object):
                 nbatch += 1
                 temp_count += 1
 
-            for name, val in eval_metric.get_name_value():
-                self.logger.info('Epoch[%d] Train-%s=%f', epoch, name, val)
-            toc = time.time()
-            self.logger.info('Epoch[%d] Time cost=%.3f', epoch, (toc - tic))
-
-            arg_params, aux_params = self.module.get_params()
-            self.module.set_params(arg_params, aux_params)
-
-            if epoch_end_callback is not None and rank == 0:
-                for callback in _as_list(epoch_end_callback):
-                    callback(epoch, self.symbol, arg_params, aux_params)
-            if eval_data:
-                res = self.module.score(eval_data, validate_metric,
-                                        score_end_callback=None,
-                                        batch_end_callback=None,
-                                        reset=True,
-                                        epoch=epoch)
-                for name, val in res:
-                    self.logger.info('Epoch[%d] Validation-%s=%f', epoch, name, val)
+            # for name, val in eval_metric.get_name_value():
+            #     self.logger.info('Epoch[%d] Train-%s=%f', epoch, name, val)
+            # toc = time.time()
+            # self.logger.info('Epoch[%d] Time cost=%.3f', epoch, (toc - tic))
+            #
+            # arg_params, aux_params = self.module.get_params()
+            # self.module.set_params(arg_params, aux_params)
+            #
+            # if epoch_end_callback is not None and rank == 0:
+            #     for callback in _as_list(epoch_end_callback):
+            #         callback(epoch, self.symbol, arg_params, aux_params)
+            # if eval_data:
+            #     res = self.module.score(eval_data, validate_metric,
+            #                             score_end_callback=None,
+            #                             batch_end_callback=None,
+            #                             reset=True,
+            #                             epoch=epoch)
+            #     for name, val in res:
+            #         self.logger.info('Epoch[%d] Validation-%s=%f', epoch, name, val)
 
             train_data.reset()

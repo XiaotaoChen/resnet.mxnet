@@ -209,8 +209,8 @@ def main(config):
                     context=devs)
     # epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.model_prefix)
     epoch_end_callback = _save_model("./model/" + config.model_prefix, rank)
-    batch_end_callback = mx.callback.Speedometer(config.batch_size, config.frequent)
-    # batch_end_callback = DetailSpeedometer(config.batch_size, config.frequent)
+    # batch_end_callback = mx.callback.Speedometer(config.batch_size, config.frequent)
+    batch_end_callback = DetailSpeedometer(config.batch_size, 10)
     initializer = mx.init.Xavier(rnd_type='gaussian', factor_type='in', magnitude=2)
     arg_params = None
     aux_params = None
