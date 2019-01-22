@@ -118,6 +118,10 @@ def main(config):
                                       bottle_neck=config.bottle_neck)
     elif config.network == 'vgg16' or config.network == 'mobilenet' or config.network == 'shufflenet':
         symbol = eval(config.network)(num_classes=config.num_classes)
+    elif config.network == 'vgg':
+        symbol = eval(config.network)(num_classes=config.num_classes, num_layers=16, batch_norm=False, dtype='float32')
+    elif config.network == 'googlenet' or config.network == 'inception_bn':
+        symbol = eval(config.network)(num_classes=config.num_classes)
     elif config.network == 'test_symbol':
         symbol = eval(config.network)(num_classes=config.num_classes)
 
