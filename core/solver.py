@@ -80,7 +80,7 @@ class Solver(object):
         temp_count = 0
         # training loop
         for epoch in range(begin_epoch, num_epoch):
-            if temp_count > 500:
+            if temp_count > 200:
                 break
 
             train_time = AverageMeter()
@@ -95,7 +95,7 @@ class Solver(object):
             end_of_batch = False
             next_data_batch = next(data_iter)
             # while not end_of_batch:
-            while temp_count <= 500:
+            while temp_count <= 200:
                 # ndarray.waitall()
                 start_time = time.time()
                 data_batch = next_data_batch
