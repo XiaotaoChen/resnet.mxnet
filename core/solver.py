@@ -80,6 +80,8 @@ class Solver(object):
         temp_count = 0
         # training loop
         for epoch in range(begin_epoch, num_epoch):
+            if temp_count > 500:
+                break
 
             train_time = AverageMeter()
             kvstore_sync_time = AverageMeter()
@@ -92,8 +94,8 @@ class Solver(object):
             data_iter = iter(train_data)
             end_of_batch = False
             next_data_batch = next(data_iter)
-            while not end_of_batch:
-            # while temp_count <= 1000:
+            # while not end_of_batch:
+            while temp_count <= 500:
                 # ndarray.waitall()
                 start_time = time.time()
                 data_batch = next_data_batch
@@ -156,16 +158,16 @@ class Solver(object):
             arg_params, aux_params = self.module.get_params()
             self.module.set_params(arg_params, aux_params)
 
-            if epoch_end_callback is not None and rank == 0:
-                for callback in _as_list(epoch_end_callback):
-                    callback(epoch, self.symbol, arg_params, aux_params)
-            if eval_data:
-                res = self.module.score(eval_data, validate_metric,
-                                        score_end_callback=None,
-                                        batch_end_callback=None,
-                                        reset=True,
-                                        epoch=epoch)
-                for name, val in res:
-                    self.logger.info('Epoch[%d] Validation-%s=%f', epoch, name, val)
+            # if epoch_end_callback is not None and rank == 0:
+            #     for callback in _as_list(epoch_end_callback):
+            #         callback(epoch, self.symbol, arg_params, aux_params)
+            # if eval_data:
+            #     res = self.module.score(eval_data, validate_metric,
+            #                             score_end_callback=None,
+            #                             batch_end_callback=None,
+            #                             reset=True,
+            #                             epoch=epoch)
+            #     for name, val in res:
+            #         self.logger.info('Epoch[%d] Validation-%s=%f', epoch, name, val)
 
             train_data.reset()
