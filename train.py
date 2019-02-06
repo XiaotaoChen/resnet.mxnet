@@ -168,11 +168,16 @@ def main(config):
         print('using MultiFactorScheduler warmup lr', config.warmup_lr, 'warm_epoch', config.warm_epoch,
               'warm_step', int(config.warm_epoch * epoch_size), "lr: ", lr, "lr_epoch_diff: ",
               lr_epoch_diff, "lr_iters: ", lr_iters)
-        lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(base_lr=lr, step=lr_iters, factor=config.lr_factor,
-                                            warmup_mode='linear',
-                                            warmup_begin_lr=config.warmup_lr,
-                                            warmup_steps=int(config.warm_epoch * epoch_size))
-
+        if len(lr_iters) >= 1:
+            lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(base_lr=lr, step=lr_iters, factor=config.lr_factor,
+                                                warmup_mode='linear',
+                                                warmup_begin_lr=config.warmup_lr,
+                                                warmup_steps=int(config.warm_epoch * epoch_size))
+        else:
+            lr_scheduler = mx.lr_scheduler.MultiFactorScheduler(base_lr=lr, step=[1], factor=1.0,
+                                                                warmup_mode='linear',
+                                                                warmup_begin_lr=config.warmup_lr,
+                                                                warmup_steps=int(config.warm_epoch * epoch_size))
     optimizer_params = {
         'learning_rate': lr,
         'wd': config.wd,
