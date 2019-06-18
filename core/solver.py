@@ -78,6 +78,12 @@ class Solver(object):
             eval_metric = metric.create(eval_metric)
 
         temp_count = 0
+
+        # # test model size by saving params of model
+        # arg_params, aux_params = self.module.get_params()
+        # for callback in _as_list(epoch_end_callback):
+        #     callback(0, self.symbol, arg_params, aux_params)
+
         # training loop
         for epoch in range(begin_epoch, num_epoch):
 

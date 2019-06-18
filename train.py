@@ -64,7 +64,7 @@ def main(config):
     data_shapes = [('data', tuple([config.batch_size] + config.image_shape))]
     label_shapes = [('softmax_label', (config.batch_size,))]
 
-    if config.network == 'resnet':
+    if config.network == 'resnet' or config.network == 'resnet_int8':
         symbol = eval(config.network)(units=config.units,
                                       num_stage=config.num_stage,
                                       filter_list=config.filter_list,
@@ -92,7 +92,10 @@ def main(config):
     elif config.network == 'vgg16' or config.network == 'mobilenet' or config.network == 'shufflenet':
         symbol = eval(config.network)(num_classes=config.num_classes)
 
+
     # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
+    # import sys
+    # sys.exit()
 
     # memonger
     if config.memonger:
@@ -174,7 +177,8 @@ def main(config):
                     label_shapes=label_shapes,
                     logger=logging,
                     context=devs)
-    epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.model_prefix)
+    # epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.model_prefix)
+    epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.network)
     batch_end_callback = mx.callback.Speedometer(config.batch_size, config.frequent)
     # batch_end_callback = DetailSpeedometer(config.batch_size, config.frequent)
     initializer = mx.init.Xavier(rnd_type='gaussian', factor_type='in', magnitude=2)

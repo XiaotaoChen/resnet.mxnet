@@ -14,7 +14,7 @@ config.model_load_epoch = 0
 config.retrain = False
 
 # data
-config.data_dir = '/data/ILSVRC2012'
+config.data_dir = '/mnt/tscpfs/bigfile/data/ILSVRC2012'
 config.batch_per_gpu = 64
 config.batch_size = config.batch_per_gpu * len(config.gpu_list)
 config.kv_store = 'local'
@@ -36,15 +36,15 @@ config.frequent = 20
 config.warmup = True
 config.warmup_lr = 0.1
 config.warm_epoch = 5
-config.lr_scheduler = 'poly'
+config.lr_scheduler = 'warmup'
 config.optimizer = 'sgd'
 # set image_shape for io and network
 config.image_shape = [3, 224, 224]
-config.benchmark = False
+config.benchmark = True
 config.num_group = 64
 config.data_type = 'float32'
 config.grad_scale = 1.0
-config.data_nthreads = 16
+config.data_nthreads = 4
 config.use_multiple_iter = False
 config.use_dali_iter = False
 config.memonger = False
