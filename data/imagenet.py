@@ -145,7 +145,7 @@ class MultipleDataIter(DataIter):
 def imagenet_iterator(data_dir, batch_size, kv, image_shape):
     num_examples = 1281167
 
-    if config.benchmark is not None and config.benchmark is True:
+    if config.benchmark is not None and config.benchmark > 0:
         data_shape = (batch_size,) + image_shape
         train = SyntheticDataIter(config.num_classes, data_shape, 5005, np.float32)
         return (train, None, num_examples)
@@ -155,6 +155,7 @@ def imagenet_iterator(data_dir, batch_size, kv, image_shape):
             label_width         = 1,
             data_name           = 'data',
             label_name          = 'softmax_label',
+            resize              = 256,
             data_shape          = image_shape,
             batch_size          = batch_size,
             pad                 = 0,

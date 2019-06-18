@@ -40,11 +40,11 @@ config.lr_scheduler = 'warmup'
 config.optimizer = 'sgd'
 # set image_shape for io and network
 config.image_shape = [3, 224, 224]
-config.benchmark = True
+config.benchmark = 0
 config.num_group = 64
 config.data_type = 'float32'
 config.grad_scale = 1.0
-config.data_nthreads = 4
+config.data_nthreads = 8
 config.use_multiple_iter = False
 config.use_dali_iter = False
 config.memonger = False

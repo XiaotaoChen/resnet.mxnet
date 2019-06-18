@@ -222,6 +222,8 @@ def parse_args():
     parser.add_argument('--data_type', help='data type', default=config.data_type, type=str)
     parser.add_argument('--grad_scale', help='grad scale for fp16', default=config.grad_scale, type=float)
     parser.add_argument('--batch_per_gpu', help='batch size per gpu', default=config.batch_per_gpu, type=int)
+    parser.add_argument('--benchmark', help='test network without data', default=config.benchmark, type=int)
+
     # memory
     parser.add_argument('--memonger', help='use memonger to put more images on a single GPU', default=config.memonger, type=int)
     args = parser.parse_args()
@@ -249,6 +251,7 @@ def set_config(args):
     config.batch_per_gpu = args.batch_per_gpu
     config.batch_size = config.batch_per_gpu * len(config.gpu_list)
     config.memonger = args.memonger
+    config.benchmark = args.benchmark
 
 
 if __name__ == '__main__':
