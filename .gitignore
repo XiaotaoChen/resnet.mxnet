@@ -100,9 +100,10 @@ ENV/
 # mypy
 .mypy_cache/
 
-# .tmp, .txt, .sh, .params, .json
+# .tmp, .txt, .sh, .params, .json, .out
 *.tmp
 *.txt
 *.sh
 *.params
 *.json
+*.out

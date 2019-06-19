@@ -64,7 +64,7 @@ def main(config):
     data_shapes = [('data', tuple([config.batch_size] + config.image_shape))]
     label_shapes = [('softmax_label', (config.batch_size,))]
 
-    if config.network == 'resnet' or config.network == 'resnet_int8':
+    if config.network == 'resnet':
         symbol = eval(config.network)(units=config.units,
                                       num_stage=config.num_stage,
                                       filter_list=config.filter_list,
@@ -73,6 +73,16 @@ def main(config):
                                       bottle_neck=config.bottle_neck,
                                       grad_scale=config.grad_scale,
                                       memonger=config.memonger)
+    elif config.network == 'resnet_int8':
+        symbol = eval(config.network)(units=config.units,
+                                      num_stage=config.num_stage,
+                                      filter_list=config.filter_list,
+                                      num_classes=config.num_classes,
+                                      data_type=config.data_type,
+                                      bottle_neck=config.bottle_neck,
+                                      grad_scale=config.grad_scale,
+                                      memonger=config.memonger,
+                                      quant_mod=config.quant_mod)
     elif config.network == 'resnet_mxnet':
         symbol = eval(config.network)(units=config.units,
                                       num_stage=config.num_stage,
@@ -223,6 +233,8 @@ def parse_args():
     parser.add_argument('--grad_scale', help='grad scale for fp16', default=config.grad_scale, type=float)
     parser.add_argument('--batch_per_gpu', help='batch size per gpu', default=config.batch_per_gpu, type=int)
     parser.add_argument('--benchmark', help='test network without data', default=config.benchmark, type=int)
+    parser.add_argument('--quant_mod', help='the quantize mode for weight, bias and activation',
+                        default='power2', type=str)
 
     # memory
     parser.add_argument('--memonger', help='use memonger to put more images on a single GPU', default=config.memonger, type=int)
@@ -252,6 +264,7 @@ def set_config(args):
     config.batch_size = config.batch_per_gpu * len(config.gpu_list)
     config.memonger = args.memonger
     config.benchmark = args.benchmark
+    config.quant_mod = args.quant_mod
 
 
 if __name__ == '__main__':

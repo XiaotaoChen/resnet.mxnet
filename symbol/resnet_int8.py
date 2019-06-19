@@ -8,17 +8,18 @@ eps = 1e-5
 
 
 def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottle_neck=True,
-                  bn_mom=0.9, workspace=512, memonger=False, is_train=True):
+                  bn_mom=0.9, workspace=512, memonger=False, is_train=True, quant_mod='power2'):
     if bottle_neck:
         bn1 = mx.sym.BatchNorm(data=data, fix_gamma=False, eps=eps, momentum=bn_mom, name=name + '_bn1')
         act1 = mx.sym.Activation(data=bn1, act_type='relu', name=name + '_relu1')
 
         relu1_q = mx.sym.Quantization_int8(data=act1, is_weight=False,
                                            ema_decay=0.99, delay_quant=0, is_train=is_train,
-                                           name=name + "_relu1_quant")
+                                           name=name + "_relu1_quant", quant_mod=quant_mod)
         # weight to be quantized
         weight_conv1 = mx.sym.Variable(name=name + "_conv1_weight", shape=(num_filter // 4, channel, 1, 1))
-        weight_conv1_q = mx.sym.Quantization_int8(weight_conv1, name=name + "_conv1_weight_quant")
+        weight_conv1_q = mx.sym.Quantization_int8(weight_conv1, name=name + "_conv1_weight_quant",
+                                                  quant_mod=quant_mod)
 
         conv1 = mx.sym.Convolution(data=relu1_q, num_filter=int(num_filter * 0.25), kernel=(1, 1), stride=(1, 1),
                                    pad=(0, 0), no_bias=True, workspace=workspace,
@@ -28,9 +29,10 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
 
         relu2_q = mx.sym.Quantization_int8(data=act2, is_weight=False,
                                            ema_decay=0.99, delay_quant=0, is_train=is_train,
-                                           name=name + "_relu2_quant")
+                                           name=name + "_relu2_quant", quant_mod=quant_mod)
         weight_conv2 = mx.sym.Variable(name=name + "_conv2_weight", shape=(num_filter // 4, num_filter // 4, 3, 3))
-        weight_conv2_q = mx.sym.Quantization_int8(weight_conv2, name=name + "_conv2_weight_quant")
+        weight_conv2_q = mx.sym.Quantization_int8(weight_conv2, name=name + "_conv2_weight_quant",
+                                                  quant_mod=quant_mod)
 
         conv2 = mx.sym.Convolution(data=relu2_q, num_filter=int(num_filter * 0.25), kernel=(3, 3), stride=stride,
                                    pad=(1, 1), no_bias=True, workspace=workspace,
@@ -40,9 +42,10 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
 
         relu3_q = mx.sym.Quantization_int8(data=act3, is_weight=False,
                                            ema_decay=0.99, delay_quant=0, is_train=is_train,
-                                           name=name + "_relu3_quant")
+                                           name=name + "_relu3_quant", quant_mod=quant_mod)
         weight_conv3 = mx.sym.Variable(name=name + "_conv3_weight", shape=(num_filter, num_filter // 4, 1, 1))
-        weight_conv3_q = mx.sym.Quantization_int8(weight_conv3, name=name + "_conv3_weight_quant")
+        weight_conv3_q = mx.sym.Quantization_int8(weight_conv3, name=name + "_conv3_weight_quant",
+                                                  quant_mod=quant_mod)
 
         conv3 = mx.sym.Convolution(data=relu3_q, num_filter=num_filter, kernel=(1, 1), stride=(1, 1), pad=(0, 0),
                                    no_bias=True, workspace=workspace,
@@ -51,7 +54,7 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
             shortcut = data
         else:
             weight_sc = mx.sym.Variable(name=name + "_sc_weight", shape=(num_filter, channel, 1, 1))
-            weight_sc_q = mx.sym.Quantization_int8(weight_sc, name=name + "_sc_weight_quant")
+            weight_sc_q = mx.sym.Quantization_int8(weight_sc, name=name + "_sc_weight_quant", quant_mod=quant_mod)
 
             shortcut = mx.sym.Convolution(data=relu1_q, num_filter=num_filter, kernel=(1, 1), stride=stride, no_bias=True,
                                           workspace=workspace, name=name + '_sc', weight=weight_sc_q)
@@ -64,10 +67,10 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
         act1 = mx.sym.Activation(data=bn1, act_type='relu', name=name + '_relu1')
 
         relu1_q = mx.sym.Quantization_int8(data=act1, is_weight=False,
-                                           ema_decay=0.99, delay_quant=0, is_train=is_train)
+                                           ema_decay=0.99, delay_quant=0, is_train=is_train, quant_mod=quant_mod)
         # weight to be quantized
         weight_conv1 = mx.sym.Variable(name=name + "_conv1_weight", shape=(num_filter, channel, 3, 3))
-        weight_conv1_q = mx.sym.Quantization_int8(weight_conv1)
+        weight_conv1_q = mx.sym.Quantization_int8(weight_conv1, quant_mod=quant_mod)
 
         conv1 = mx.sym.Convolution(data=relu1_q, num_filter=num_filter, kernel=(3, 3), stride=stride, pad=(1, 1),
                                    no_bias=True, workspace=workspace, name=name + '_conv1',
@@ -76,9 +79,9 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
         act2 = mx.sym.Activation(data=bn2, act_type='relu', name=name + '_relu2')
 
         relu2_q = mx.sym.Quantization_int8(data=act2, is_weight=False,
-                                           ema_decay=0.99, delay_quant=0, is_train=is_train)
+                                           ema_decay=0.99, delay_quant=0, is_train=is_train, quant_mod=quant_mod)
         weight_conv2 = mx.sym.Variable(name=name + "_conv2_weight", shape=(num_filter, num_filter, 3, 3))
-        weight_conv2_q = mx.sym.Quantization_int8(weight_conv2)
+        weight_conv2_q = mx.sym.Quantization_int8(weight_conv2, quant_mod=quant_mod)
 
         conv2 = mx.sym.Convolution(data=relu2_q, num_filter=num_filter, kernel=(3, 3), stride=(1, 1), pad=(1, 1),
                                    no_bias=True, workspace=workspace, name=name + '_conv2',
@@ -87,7 +90,7 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
             shortcut = data
         else:
             weight_sc = mx.sym.Variable(name=name + "_sc_weight", shape=(num_filter, channel, 1, 1))
-            weight_sc_q = mx.sym.Quantization_int8(weight_sc)
+            weight_sc_q = mx.sym.Quantization_int8(weight_sc, quant_mod=quant_mod)
 
             shortcut = mx.sym.Convolution(data=relu1_q, num_filter=num_filter, kernel=(1, 1), stride=stride, no_bias=True,
                                           workspace=workspace, name=name + '_sc',
@@ -99,7 +102,7 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
 
 
 def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_neck=True,
-           bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0, is_train=True):
+           bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0, is_train=True, quant_mod='power2'):
     num_unit = len(units)
     assert (num_unit == num_stage)
 
@@ -110,14 +113,14 @@ def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_ne
         data = mx.sym.Cast(data=data, dtype=np.float16)
 
     weight = mx.sym.Variable(name="conv0_weight", shape=(filter_list[0], 3, 7, 7))
-    weight_q = mx.sym.Quantization_int8(weight, name="conv0_weight_quant")
+    weight_q = mx.sym.Quantization_int8(weight, name="conv0_weight_quant", quant_mod=quant_mod)
     body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(7, 7), stride=(2, 2), pad=(3, 3),
                               no_bias=True, name="conv0", workspace=workspace, weight=weight_q)
     body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=eps, momentum=bn_mom, name='bn0')
     body = mx.sym.Activation(data=body, act_type='relu', name='relu0')
     body = mx.sym.Quantization_int8(data=body, is_weight=False,
                                     ema_decay=0.99, delay_quant=0, is_train=is_train,
-                                           name="relu0_quant")
+                                           name="relu0_quant", quant_mod=quant_mod)
 
     body = mx.symbol.Pooling(data=body, kernel=(3, 3), stride=(2, 2), pad=(1, 1), pool_type='max')
 
@@ -133,7 +136,7 @@ def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_ne
 
     relu1 = mx.sym.Quantization_int8(data=relu1, is_weight=False,
                                     ema_decay=0.99, delay_quant=0, is_train=is_train,
-                                           name="relu1_quant")
+                                    name="relu1_quant", quant_mod=quant_mod)
 
 
     pool1 = mx.symbol.Pooling(data=relu1, global_pool=True, kernel=(7, 7), pool_type='avg', name='pool1')
