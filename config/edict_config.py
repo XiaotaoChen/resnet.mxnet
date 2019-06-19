@@ -3,7 +3,6 @@ from easydict import EasyDict as edict
 config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
-config.mxnet_path = '../mxnet/python/'
 config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
 config.dataset = "imagenet"
 config.model_prefix = "resnet50"
