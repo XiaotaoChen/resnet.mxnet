@@ -19,7 +19,7 @@ config.batch_size = config.batch_per_gpu * len(config.gpu_list)
 config.kv_store = 'local'
 
 # optimizer
-config.lr = 3.2
+config.lr = 0.1 * config.batch_per_gpu * len(config.gpu_list) / 256
 config.wd = 0.0001
 config.momentum = 0.9
 config.multi_precision = True

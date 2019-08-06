@@ -13,7 +13,6 @@ import datetime
 import pprint
 from core.scheduler import WarmupMultiFactorScheduler
 
-
 def main(config):
     # log file
     log_dir = "./log"
@@ -29,6 +28,10 @@ def main(config):
     formatter = logging.Formatter('%(name)s %(levelname)s %(message)s')
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
+
+    logging.info(config)
+
+
     # model folder
     model_dir = "./model"
     if not os.path.exists(model_dir):
@@ -57,8 +60,9 @@ def main(config):
                                                      batch_size=config.batch_size,
                                                      kv=kv,
                                                      image_shape=tuple(config.image_shape))
-    print train
-    print val
+    logging.info(train)
+    logging.info(val)
+
     data_names = ('data',)
     label_names = ('softmax_label',)
     data_shapes = [('data', tuple([config.batch_size] + config.image_shape))]
@@ -118,7 +122,7 @@ def main(config):
         # if config.network == 'resnet':
         #     last_block = 'conv3_1_relu'
         #     if kv.rank == 0:
-        #         print("resnet do memonger up to {}".format(last_block))
+        #         logging.info("resnet do memonger up to {}".format(last_block))
         # else:
         #     last_block = None
         last_block = 'stage4_unit1_sc'
@@ -129,7 +133,7 @@ def main(config):
     epoch_size = max(int(num_examples / config.batch_size / kv.num_workers), 1)
     if 'dist' in config.kv_store and not 'async' in config.kv_store \
             and config.use_multiple_iter is False and config.use_dali_iter is False:
-        logging.info('Resizing training data to %d batches per machine', epoch_size)
+        logging.info('Resizing training data to %d batches per machine {}'.format(epoch_size))
         # resize train iter to ensure each machine has same number of batches per epoch
         # if not, dist_sync can hang at the end with one machine waiting for other machines
         train = mx.io.ResizeIter(train, epoch_size)
@@ -139,15 +143,16 @@ def main(config):
         lr_epoch_diff = [epoch - config.begin_epoch for epoch in lr_epoch if epoch > config.begin_epoch]
         lr = config.lr * (config.lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
         lr_iters = [int(epoch * epoch_size) for epoch in lr_epoch_diff]
-        print 'warmup lr', config.warmup_lr, 'warm_epoch', config.warm_epoch, 'warm_step', int(config.warm_epoch * epoch_size)
-
+        logging.info('warmup lr:{}, warm_epoch:{}, warm_step:{}, '.format(
+            config.warmup_lr, config.warm_epoch, int(config.warm_epoch * epoch_size)))
         if config.lr_scheduler == 'poly':
-            print 'PolyScheduler lr', lr
+            logging.info('PolyScheduler lr'.format(lr))
             lr_scheduler = mx.lr_scheduler.PolyScheduler(int(epoch_size*config.num_epoch), base_lr=lr, pwr=2, final_lr=0,
                                                          warmup_steps=int(config.warm_epoch * epoch_size),
                                                          warmup_begin_lr=0, warmup_mode='linear')
         else:
-            print 'WarmupMultiFactorScheduler lr', lr, 'lr_epoch_diff', lr_epoch_diff, 'lr_iters', lr_iters
+            logging.info('WarmupMultiFactorScheduler lr:{}, lr_epoch_diff:{}, '
+                         'lr_iters:{}'.format( lr, lr_epoch_diff, lr_iters))
             lr_scheduler = WarmupMultiFactorScheduler(base_lr=lr, step=lr_iters, factor=config.lr_factor,
                                                   warmup=True, warmup_type='gradual',
                                                   warmup_lr=config.warmup_lr, warmup_step=int(config.warm_epoch * epoch_size))
@@ -269,11 +274,8 @@ def set_config(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    print 'Called with argument:', args
     now = datetime.datetime.now()
     date = '{}_{:0>2}_{:0>2}'.format(now.year, now.month, now.day)
 
     set_config(args)
-
-    pprint.pprint(config)
     main(config)

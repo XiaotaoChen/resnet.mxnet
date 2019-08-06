@@ -5,7 +5,7 @@ import mxnet as mx
 from mxnet.module import Module
 from mxnet import metric
 #from mxnet.model import BatchEndParam
-from callback import BatchEndParam
+from .callback import BatchEndParam
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""

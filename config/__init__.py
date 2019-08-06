@@ -1,1 +1,1 @@
-from cfgs import *
+from .cfgs import *
