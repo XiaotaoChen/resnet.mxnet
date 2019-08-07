@@ -103,7 +103,7 @@ ENV/
 # .tmp, .txt, .sh, .params, .json, .out
 *.tmp
 *.txt
-*.sh
+#*.sh
 *.params
 *.json
 *.out
