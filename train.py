@@ -169,7 +169,7 @@ def main(config):
         lr = config.lr * (config.lr_factor **(len(config.lr_step) - len(lr_epoch_diff)))
         lr_scheduler = multi_factor_scheduler(config.begin_epoch, epoch_size, step=config.lr_step,
                                               factor=config.lr_factor)
-        step_ = lr_epoch_diff * epoch_size
+        step_ = [epoch * epoch_size for epoch in lr_epoch_diff]
         logging.info('multi_factor_scheduler lr:{}, step:{}'.format(lr, step_))
     else:
         lr = config.lr
