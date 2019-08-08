@@ -159,8 +159,8 @@ def main(config):
                                                          warmup_steps=int(config.warm_epoch * epoch_size),
                                                          warmup_begin_lr=0, warmup_mode='linear')
         else:
-            logging.info('WarmupMultiFactorScheduler lr:{}, lr_epoch_diff:{}, '
-                         'lr_iters:{}'.format( lr, lr_epoch_diff, lr_iters))
+            logging.info('WarmupMultiFactorScheduler lr:{}, epoch size:{}, lr_epoch_diff:{}, '
+                         'lr_iters:{}'.format( lr, epoch_size, lr_epoch_diff, lr_iters))
             lr_scheduler = WarmupMultiFactorScheduler(base_lr=lr, step=lr_iters, factor=config.lr_factor,
                                                   warmup=True, warmup_type='gradual',
                                                   warmup_lr=config.warmup_lr, warmup_step=int(config.warm_epoch * epoch_size))
@@ -170,7 +170,8 @@ def main(config):
         lr_scheduler = multi_factor_scheduler(config.begin_epoch, epoch_size, step=config.lr_step,
                                               factor=config.lr_factor)
         step_ = [epoch * epoch_size for epoch in lr_epoch_diff]
-        logging.info('multi_factor_scheduler lr:{}, step:{}'.format(lr, step_))
+        logging.info('multi_factor_scheduler lr:{}, epoch size:{}, epoch diff:{}, '
+                     'step:{}'.format(lr, epoch_size, lr_epoch_diff, step_))
     else:
         lr = config.lr
         lr_scheduler = None
