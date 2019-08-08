@@ -86,7 +86,8 @@ def main(config):
                                       bottle_neck=config.bottle_neck,
                                       grad_scale=config.grad_scale,
                                       memonger=config.memonger,
-                                      quant_mod=config.quant_mod)
+                                      quant_mod=config.quant_mod,
+                                      delay_quant=config.delay_quant)
     elif config.network == 'resnet_mxnet':
         symbol = eval(config.network)(units=config.units,
                                       num_stage=config.num_stage,
@@ -157,9 +158,12 @@ def main(config):
                                                   warmup=True, warmup_type='gradual',
                                                   warmup_lr=config.warmup_lr, warmup_step=int(config.warm_epoch * epoch_size))
     elif config.lr_step is not None:
+        lr_epoch_diff = [epoch - config.begin_epoch for epoch in config.lr_step if epoch > config.begin_epoch]
+        lr = config.lr * (config.lr_factor **(len(config.lr_step) - len(lr_epoch_diff)))
         lr_scheduler = multi_factor_scheduler(config.begin_epoch, epoch_size, step=config.lr_step,
                                               factor=config.lr_factor)
     else:
+        lr = config.lr
         lr_scheduler = None
 
     optimizer_params = {
@@ -192,14 +196,15 @@ def main(config):
                     label_shapes=label_shapes,
                     logger=logging,
                     context=devs)
-    # epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.model_prefix)
-    epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.network)
+    epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.model_prefix)
+    # epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.network)
     batch_end_callback = mx.callback.Speedometer(config.batch_size, config.frequent)
     # batch_end_callback = DetailSpeedometer(config.batch_size, config.frequent)
     initializer = mx.init.Xavier(rnd_type='gaussian', factor_type='in', magnitude=2)
     arg_params = None
     aux_params = None
     if config.retrain:
+        print('******************** retrain load pretrain model from: model/{}'.format(config.model_load_prefix))
         _, arg_params, aux_params = mx.model.load_checkpoint("model/{}".format(config.model_load_prefix),
                                                              config.model_load_epoch)
     solver.fit(train_data=train,
@@ -214,7 +219,9 @@ def main(config):
                optimizer_params=optimizer_params,
                begin_epoch=config.begin_epoch,
                num_epoch=config.num_epoch,
-               kvstore=kv)
+               kvstore=kv,
+               allow_missing=config.allow_missing
+               )
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train Faster R-CNN network')
@@ -240,6 +247,8 @@ def parse_args():
     parser.add_argument('--benchmark', help='test network without data', default=config.benchmark, type=int)
     parser.add_argument('--quant_mod', help='the quantize mode for weight, bias and activation',
                         default='power2', type=str)
+    parser.add_argument('--delay_quant', help='after delay_quant iterations to execute quantization int8 op',
+                        default=config.delay_quant, type=int)
 
     # memory
     parser.add_argument('--memonger', help='use memonger to put more images on a single GPU', default=config.memonger, type=int)
@@ -270,6 +279,7 @@ def set_config(args):
     config.memonger = args.memonger
     config.benchmark = args.benchmark
     config.quant_mod = args.quant_mod
+    config.delay_quant = args.delay_quant
 
 
 if __name__ == '__main__':

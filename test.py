@@ -16,7 +16,7 @@ def main(config):
                                   batch_size=config.batch_size,
                                   kv=kv,
                                   image_shape=tuple(config.image_shape))
-    print model.score(val)
+    print(model.score(val))
 
 
 if __name__ == '__main__':

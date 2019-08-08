@@ -34,7 +34,7 @@ def _as_list(obj):
 class Solver(object):
     def __init__(self, symbol, data_names, label_names,
                  data_shapes, label_shapes, logger=logging,
-                 context=mx.cpu(), work_load_list=None, fixed_param_names=None):
+                 context=mx.cpu(), work_load_list=None, fixed_param_names=None, allow_missing=False):
         self.symbol = symbol
         self.data_names = data_names
         self.label_names = label_names

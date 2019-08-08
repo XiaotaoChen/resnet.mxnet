@@ -4,13 +4,20 @@ config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
+# config.gpu_list = [0, 1, 2, 3]
 config.dataset = "imagenet"
-config.model_prefix = "resnet50"
-config.network = "resnet"
+config.network = "mobilenet"
 config.depth = 50
-config.model_load_prefix = config.model_prefix
 config.model_load_epoch = 0
+config.model_prefix = config.network
+# config.model_prefix = config.network + "_retrain_" + str(config.model_load_epoch)
+config.model_load_prefix = 'mobilenet/mobilenet1.0'
 config.retrain = False
+# for int8 training
+config.quant_mode = 'minmax'
+config.delay_quant = 0
+config.allow_missing = False
+
 
 # data
 config.data_dir = '/mnt/tscpfs/bigfile/data/ILSVRC2012'
@@ -32,7 +39,10 @@ config.begin_epoch = config.model_load_epoch if config.retrain else 0
 config.num_epoch = 100
 config.frequent = 20
 # for distributed training
-config.warmup = True
+if config.lr > 0.1:
+    config.warmup = True
+else:
+    config.warmup = False
 config.warmup_lr = 0.1
 config.warm_epoch = 5
 config.lr_scheduler = 'warmup'
@@ -47,10 +57,6 @@ config.data_nthreads = 16
 config.use_multiple_iter = False
 config.use_dali_iter = False
 config.memonger = False
-
-
-
-
 
 # network config
 if config.dataset == "imagenet":
