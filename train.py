@@ -56,10 +56,16 @@ def main(config):
     #                                              image_shape=tuple(config.image_shape),
     #                                              num_gpus=len(devs))
     else:
-        train, val, num_examples = imagenet_iterator(data_dir=config.data_dir,
-                                                     batch_size=config.batch_size,
-                                                     kv=kv,
-                                                     image_shape=tuple(config.image_shape))
+        if config.dataset == 'imagenet':
+            train, val, num_examples = imagenet_iterator(data_dir=config.data_dir,
+                                                         batch_size=config.batch_size,
+                                                         kv=kv,
+                                                         image_shape=tuple(config.image_shape))
+        elif config.dataset == 'cifar10':
+            train, val, num_examples = cifar10_iterator(data_dir=config.data_dir,
+                                                         batch_size=config.batch_size,
+                                                         kv=kv,
+                                                         image_shape=tuple(config.image_shape))
     logging.info(train)
     logging.info(val)
 
@@ -76,7 +82,8 @@ def main(config):
                                       data_type=config.data_type,
                                       bottle_neck=config.bottle_neck,
                                       grad_scale=config.grad_scale,
-                                      memonger=config.memonger)
+                                      memonger=config.memonger,
+                                      dataset_type=config.dataset)
     elif config.network == 'resnet_int8':
         symbol = eval(config.network)(units=config.units,
                                       num_stage=config.num_stage,
