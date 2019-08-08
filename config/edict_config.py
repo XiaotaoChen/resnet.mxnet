@@ -5,6 +5,7 @@ config = edict()
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
 # config.gpu_list = [0, 1, 2, 3]
+config.platform = "aliyun"
 config.dataset = "cifar10"
 config.network = "resnet"
 config.depth = 50 if config.dataset == 'imagenet' else 110
@@ -18,10 +19,13 @@ config.quant_mode = 'minmax'
 config.delay_quant = 0
 config.allow_missing = False
 
-
 # data
-config.data_dir = '/mnt/tscpfs/bigfile/data/ILSVRC2012' if config.dataset == 'imagenet' \
-    else '/mnt/tscpfs/xiaotao.chen/dataset/cifar10'
+if config.platform == 'truenas':
+    config.data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/imagenet/ILSVRC2012' if config.dataset == 'imagenet' \
+        else '/mnt/truenas/scratch/xiaotao.chen/dataset/cifar10'
+else:
+    config.data_dir = '/mnt/tscpfs/bigfile/data/ILSVRC2012' if config.dataset == 'imagenet' \
+        else '/mnt/tscpfs/xiaotao.chen/dataset/cifar10'
 config.batch_per_gpu = 64
 config.batch_size = config.batch_per_gpu * len(config.gpu_list)
 config.kv_store = 'local'
