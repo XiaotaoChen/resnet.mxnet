@@ -5,9 +5,10 @@ config = edict()
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
 # config.gpu_list = [0, 1, 2, 3]
-config.dataset = "imagenet"
-config.network = "mobilenet"
-config.depth = 50
+config.platform = "aliyun"
+config.dataset = "cifar10"
+config.network = "resnet"
+config.depth = 50 if config.dataset == 'imagenet' else 110
 config.model_load_epoch = 0
 config.model_prefix = config.network
 # config.model_prefix = config.network + "_retrain_" + str(config.model_load_epoch)
@@ -18,9 +19,13 @@ config.quant_mode = 'minmax'
 config.delay_quant = 0
 config.allow_missing = False
 
-
 # data
-config.data_dir = '/mnt/tscpfs/bigfile/data/ILSVRC2012'
+if config.platform == 'truenas':
+    config.data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/imagenet/ILSVRC2012' if config.dataset == 'imagenet' \
+        else '/mnt/truenas/scratch/xiaotao.chen/dataset/cifar10'
+else:
+    config.data_dir = '/mnt/tscpfs/bigfile/data/ILSVRC2012' if config.dataset == 'imagenet' \
+        else '/mnt/tscpfs/xiaotao.chen/dataset/cifar10'
 config.batch_per_gpu = 64
 config.batch_size = config.batch_per_gpu * len(config.gpu_list)
 config.kv_store = 'local'
@@ -48,7 +53,6 @@ config.warm_epoch = 5
 config.lr_scheduler = 'warmup'
 config.optimizer = 'sgd'
 # set image_shape for io and network
-config.image_shape = [3, 224, 224]
 config.benchmark = 0
 config.num_group = 64
 config.data_type = 'float32'
@@ -61,6 +65,8 @@ config.memonger = False
 # network config
 if config.dataset == "imagenet":
     config.num_classes = 1000
+    config.image_shape = [3, 224, 224]
+    config.num_stage = 4
     config.units_dict = {"18": [2, 2, 2, 2],
                   "34": [3, 4, 6, 3],
                   "50": [3, 4, 6, 3],
@@ -73,4 +79,21 @@ if config.dataset == "imagenet":
     else:
         config.filter_list = [64, 64, 128, 256, 512]
         config.bottle_neck = False
-    config.num_stage = 4
+elif config.dataset == "cifar10":
+    config.num_classes = 10
+    config.image_shape = [3, 32, 32]
+    config.num_stage = 3
+    # depth should be one of 110, 164, 1001,...,which is should fit (args.depth-2)%9 == 0
+    if ((config.depth - 2) % 9 == 0 and config.depth >= 164):
+        per_unit = [int((config.depth - 2) / 9)]
+        config.filter_list = [16, 64, 128, 256]
+        config.bottle_neck = True
+    elif ((config.depth - 2) % 6 == 0 and config.depth < 164):
+        per_unit = [int((config.depth - 2) / 6)]
+        config.filter_list = [16, 16, 32, 64]
+        config.bottle_neck = False
+    else:
+        raise ValueError("no experiments done on detph {}, you can do it youself".format(args.depth))
+    config.units = per_unit*3
+else:
+    raise ValueError("do not support {} yet".format(config.dataset))

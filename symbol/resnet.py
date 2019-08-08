@@ -54,6 +54,49 @@ def residual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True,
 
 
 def resnet(units, num_stage, filter_list, num_classes, data_type, bottle_neck=True,
+           bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0, dataset_type=None):
+    num_unit = len(units)
+    assert (num_unit == num_stage)
+
+    data = mx.sym.Variable(name='data')
+    if data_type == 'float32':
+        data = mx.sym.identity(data=data, name='id')
+    elif data_type == 'float16':
+        data = mx.sym.Cast(data=data, dtype=np.float16)
+
+    if dataset_type == 'imagenet':
+        body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(7, 7), stride=(2, 2), pad=(3, 3),
+                                  no_bias=True, name="conv0", workspace=workspace)
+        body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=eps, momentum=bn_mom, name='bn0')
+        body = mx.sym.Activation(data=body, act_type='relu', name='relu0')
+        body = mx.symbol.Pooling(data=body, kernel=(3, 3), stride=(2, 2), pad=(1, 1), pool_type='max')
+    elif dataset_type == 'cifar10':
+        body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(3, 3), stride=(1, 1), pad=(1, 1),
+                                  no_bias=True, name="conv0", workspace=workspace)
+    else:
+        raise ValueError("resnet only support imagenet or cifar10 dataset")
+
+    for i in range(num_stage):
+        body = residual_unit(body, filter_list[i + 1], (1 if i == 0 else 2, 1 if i == 0 else 2), False,
+                             name='stage%d_unit%d' % (i + 1, 1), bottle_neck=bottle_neck, workspace=workspace,
+                             memonger=memonger)
+        for j in range(units[i] - 1):
+            body = residual_unit(body, filter_list[i + 1], (1, 1), True, name='stage%d_unit%d' % (i + 1, j + 2),
+                                 bottle_neck=bottle_neck, workspace=workspace, memonger=memonger)
+    bn1 = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=eps, momentum=bn_mom, name='bn1')
+    relu1 = mx.sym.Activation(data=bn1, act_type='relu', name='relu1')
+    pool1 = mx.symbol.Pooling(data=relu1, global_pool=True, kernel=(7, 7), pool_type='avg', name='pool1')
+    flat = mx.symbol.Flatten(data=pool1)
+    fc1 = mx.symbol.FullyConnected(data=flat, num_hidden=num_classes, name='fc1')
+    if data_type == 'float16':
+        fc1 = mx.sym.Cast(data=fc1, dtype=np.float32)
+        cls = mx.symbol.SoftmaxOutput(data=fc1, name='softmax', grad_scale=grad_scale)
+    else:
+        cls = mx.symbol.SoftmaxOutput(data=fc1, name='softmax')
+    return cls
+
+
+def resnet_cifar(units, num_stage, filter_list, num_classes, data_type, bottle_neck=True,
            bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0):
     num_unit = len(units)
     assert (num_unit == num_stage)
@@ -64,11 +107,8 @@ def resnet(units, num_stage, filter_list, num_classes, data_type, bottle_neck=Tr
     elif data_type == 'float16':
         data = mx.sym.Cast(data=data, dtype=np.float16)
 
-    body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(7, 7), stride=(2, 2), pad=(3, 3),
+    body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(3, 3), stride=(1, 1), pad=(1, 1),
                               no_bias=True, name="conv0", workspace=workspace)
-    body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=eps, momentum=bn_mom, name='bn0')
-    body = mx.sym.Activation(data=body, act_type='relu', name='relu0')
-    body = mx.symbol.Pooling(data=body, kernel=(3, 3), stride=(2, 2), pad=(1, 1), pool_type='max')
 
     for i in range(num_stage):
         body = residual_unit(body, filter_list[i + 1], (1 if i == 0 else 2, 1 if i == 0 else 2), False,
