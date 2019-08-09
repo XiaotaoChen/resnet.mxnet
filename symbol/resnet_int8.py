@@ -107,7 +107,7 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
 
 
 def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_neck=True,
-           bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0,
+           bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0, dataset_type=None,
                 is_train=True, quant_mod='power2',delay_quant=0):
     num_unit = len(units)
     assert (num_unit == num_stage)
@@ -118,18 +118,26 @@ def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_ne
     elif data_type == 'float16':
         data = mx.sym.Cast(data=data, dtype=np.float16)
 
-    weight = mx.sym.Variable(name="conv0_weight", shape=(filter_list[0], 3, 7, 7))
-    weight_q = mx.sym.Quantization_int8(weight, name="conv0_weight_quant",
-                                        is_weight=True, quant_mod=quant_mod)
-    body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(7, 7), stride=(2, 2), pad=(3, 3),
-                              no_bias=True, name="conv0", workspace=workspace, weight=weight_q)
-    body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=eps, momentum=bn_mom, name='bn0')
-    body = mx.sym.Activation(data=body, act_type='relu', name='relu0')
-    body = mx.sym.Quantization_int8(data=body, name="relu0_quant",
-                                    is_weight=False, ema_decay=0.99, delay_quant=delay_quant,
-                                    is_train=is_train, quant_mod=quant_mod)
-
-    body = mx.symbol.Pooling(data=body, kernel=(3, 3), stride=(2, 2), pad=(1, 1), pool_type='max')
+    if dataset_type == 'imagenet':
+        weight = mx.sym.Variable(name="conv0_weight", shape=(filter_list[0], 3, 7, 7))
+        weight_q = mx.sym.Quantization_int8(weight, name="conv0_weight_quant",
+                                            is_weight=True, quant_mod=quant_mod)
+        body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(7, 7), stride=(2, 2), pad=(3, 3),
+                                  no_bias=True, name="conv0", workspace=workspace, weight=weight_q)
+        body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=eps, momentum=bn_mom, name='bn0')
+        body = mx.sym.Activation(data=body, act_type='relu', name='relu0')
+        body = mx.sym.Quantization_int8(data=body, name="relu0_quant",
+                                        is_weight=False, ema_decay=0.99, delay_quant=delay_quant,
+                                        is_train=is_train, quant_mod=quant_mod)
+        body = mx.symbol.Pooling(data=body, kernel=(3, 3), stride=(2, 2), pad=(1, 1), pool_type='max')
+    elif dataset_type == 'cifar10':
+        weight = mx.sym.Variable(name="conv0_weight", shape=(filter_list[0], 3, 3, 3))
+        weight_q = mx.sym.Quantization_int8(weight, name="conv0_weight_quant",
+                                            is_weight=True, quant_mod=quant_mod)
+        body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(3, 3), stride=(1, 1), pad=(1, 1),
+                                  no_bias=True, name="conv0", workspace=workspace, weight=weight_q)
+    else:
+        raise ValueError("resnet only support imagenet or cifar10 dataset, {}".format(dataset_type))
 
     for i in range(num_stage):
         body = residual_unit_int8(body, filter_list[i], filter_list[i + 1], (1 if i == 0 else 2, 1 if i == 0 else 2), False,
