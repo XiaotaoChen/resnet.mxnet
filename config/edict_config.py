@@ -37,11 +37,12 @@ config.momentum = 0.9
 config.multi_precision = True
 if config.dataset == "imagenet":
     config.lr_step = [30, 60, 90]
+    config.num_epoch = 100
 else:
     config.lr_step = [120, 160, 240]
+    config.num_epoch = 300
 config.lr_factor = 0.1
 config.begin_epoch = config.model_load_epoch if config.retrain else 0
-config.num_epoch = 100
 config.frequent = 20
 # for distributed training
 if config.lr > 0.1:
