@@ -93,6 +93,7 @@ def main(config):
                                       bottle_neck=config.bottle_neck,
                                       grad_scale=config.grad_scale,
                                       memonger=config.memonger,
+                                      dataset_type=config.dataset,
                                       quant_mod=config.quant_mod,
                                       delay_quant=config.delay_quant)
     elif config.network == 'resnet_mxnet':
