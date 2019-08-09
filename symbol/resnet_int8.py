@@ -108,7 +108,7 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
 
 def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_neck=True,
            bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0, dataset_type=None,
-                is_train=True, quant_mod='power2',delay_quant=0):
+                is_train=True, quant_mod='minmax',delay_quant=0):
     num_unit = len(units)
     assert (num_unit == num_stage)
 
@@ -117,6 +117,8 @@ def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_ne
         data = mx.sym.identity(data=data, name='id')
     elif data_type == 'float16':
         data = mx.sym.Cast(data=data, dtype=np.float16)
+
+    data = mx.sym.BatchNorm(data=data, fix_gamma=True, eps=2e-5, momentum=bn_mom, name='bn_data')
 
     if dataset_type == 'imagenet':
         weight = mx.sym.Variable(name="conv0_weight", shape=(filter_list[0], 3, 7, 7))

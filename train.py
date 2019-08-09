@@ -257,7 +257,7 @@ def parse_args():
     parser.add_argument('--batch_per_gpu', help='batch size per gpu', default=config.batch_per_gpu, type=int)
     parser.add_argument('--benchmark', help='test network without data', default=config.benchmark, type=int)
     parser.add_argument('--quant_mod', help='the quantize mode for weight, bias and activation',
-                        default='power2', type=str)
+                        default=config.quant_mod, type=str)
     parser.add_argument('--delay_quant', help='after delay_quant iterations to execute quantization int8 op',
                         default=config.delay_quant, type=int)
 
@@ -294,9 +294,9 @@ def set_config(args):
 
 
 if __name__ == '__main__':
-    args = parse_args()
+    # args = parse_args()
     now = datetime.datetime.now()
     date = '{}_{:0>2}_{:0>2}'.format(now.year, now.month, now.day)
 
-    set_config(args)
+    # set_config(args)
     main(config)
