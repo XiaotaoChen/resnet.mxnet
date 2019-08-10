@@ -4,8 +4,8 @@ config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 #config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
-config.gpu_list = [4, 5, 6, 7]
-config.platform = "truenas"
+config.gpu_list = [0, 1, 2, 3]
+config.platform = "aliyun"
 config.dataset = "cifar10"
 config.network = "resnet_int8"
 config.depth = 50 if config.dataset == 'imagenet' else 110
@@ -14,6 +14,8 @@ config.model_prefix = config.network + '_' + config.dataset
 #config.model_prefix = config.network + "_retrain_" + str(config.model_load_epoch)
 config.model_load_prefix = 'resnet_cifar10/resnet_cifar10'
 config.retrain = False
+config.use_global_stats=False
+config.fix_gamma=False
 # for int8 training
 config.quant_mod = 'minmax'
 config.delay_quant = 0

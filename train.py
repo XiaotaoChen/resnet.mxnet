@@ -95,7 +95,9 @@ def main(config):
                                       memonger=config.memonger,
                                       dataset_type=config.dataset,
                                       quant_mod=config.quant_mod,
-                                      delay_quant=config.delay_quant)
+                                      delay_quant=config.delay_quant,
+                                      use_global_stats=config.use_global_stats,
+                                      fix_gamma=config.fix_gamma)
     elif config.network == 'resnet_mxnet':
         symbol = eval(config.network)(units=config.units,
                                       num_stage=config.num_stage,
