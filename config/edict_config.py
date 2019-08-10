@@ -8,7 +8,7 @@ config.gpu_list = [0, 1, 2, 3]
 config.platform = "aliyun"
 config.dataset = "cifar10"
 config.network = "resnet_int8"
-config.depth = 50 if config.dataset == 'imagenet' else 110
+config.depth = 50 if config.dataset == 'imagenet' else 50
 config.model_load_epoch = 0
 config.model_prefix = config.network + '_' + config.dataset
 #config.model_prefix = config.network + "_retrain_" + str(config.model_load_epoch)

@@ -1,17 +1,19 @@
 import sys
-import config
 
 import mxnet as mx
 import numpy as np
 eps = 1e-5
 
 
+# def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottle_neck=True,
+#                        bn_mom=0.9, workspace=512, memonger=False, is_train=True, quant_mod='minmax',
+#                        delay_quant=0, fix_gamma=False, use_global_stats=False):
 def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottle_neck=True,
-                       bn_mom=0.9, workspace=512, memonger=False, is_train=True, quant_mod='power2',
+                       bn_mom=0.9, workspace=512, memonger=False, is_train=True, quant_mod='minmax',
                        delay_quant=0, use_global_stats=False, fix_gamma=False):
     if bottle_neck:
         bn1 = mx.sym.BatchNorm(data=data, eps=eps, momentum=bn_mom, name=name + '_bn1',
-                                use_global_stats=use_global_stats, fix_gamma=fix_gamma)
+                                fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         act1 = mx.sym.Activation(data=bn1, act_type='relu', name=name + '_relu1')
 
         relu1_q = mx.sym.Quantization_int8(data=act1, name=name + "_relu1_quant",
@@ -26,7 +28,7 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
                                    pad=(0, 0), no_bias=True, workspace=workspace,
                                    name=name + '_conv1', weight=weight_conv1_q)
         bn2 = mx.sym.BatchNorm(data=conv1, eps=eps, momentum=bn_mom, name=name + '_bn2',
-                                use_global_stats=use_global_stats, fix_gamma=fix_gamma)
+                                fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         act2 = mx.sym.Activation(data=bn2, act_type='relu', name=name + '_relu2')
 
         relu2_q = mx.sym.Quantization_int8(data=act2, name=name + "_relu2_quant",
@@ -40,7 +42,7 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
                                    pad=(1, 1), no_bias=True, workspace=workspace,
                                    name=name + '_conv2', weight=weight_conv2_q)
         bn3 = mx.sym.BatchNorm(data=conv2, eps=eps, momentum=bn_mom, name=name + '_bn3',
-                                use_global_stats=use_global_stats, fix_gamma=fix_gamma)
+                                fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         act3 = mx.sym.Activation(data=bn3, act_type='relu', name=name + '_relu3')
 
         relu3_q = mx.sym.Quantization_int8(data=act3, name=name + "_relu3_quant",
@@ -68,7 +70,7 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
         return conv3 + shortcut
     else:
         bn1 = mx.sym.BatchNorm(data=data, momentum=bn_mom, eps=eps, name=name + '_bn1',
-                                use_global_stats=use_global_stats, fix_gamma=fix_gamma)
+                                fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         act1 = mx.sym.Activation(data=bn1, act_type='relu', name=name + '_relu1')
 
         relu1_q = mx.sym.Quantization_int8(data=act1, name=name + "_relu1_quant",
@@ -83,7 +85,7 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
                                    no_bias=True, workspace=workspace, name=name + '_conv1',
                                    weight=weight_conv1_q)
         bn2 = mx.sym.BatchNorm(data=conv1, momentum=bn_mom, eps=eps, name=name + '_bn2',
-                                use_global_stats=use_global_stats, fix_gamma=fix_gamma)
+                                fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         act2 = mx.sym.Activation(data=bn2, act_type='relu', name=name + '_relu2')
 
         relu2_q = mx.sym.Quantization_int8(data=act2, name=name + "_relu2_quant",
@@ -111,12 +113,21 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
         return conv2 + shortcut
 
 
+# def resnet_int8(units, num_stage, filter_list, num_class, data_type, bottle_neck=True,
+#                 bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0,
+#                 is_train=True, quant_mod='minmax',delay_quant=0,
+#                 fix_gamma=False, use_global_stats=False):
 def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_neck=True,
-           bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0, dataset_type=None,
-                is_train=True, quant_mod='minmax',delay_quant=0, use_global_stats=False, fix_gamma=False):
+                bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0, dataset_type=None,
+                is_train=True, quant_mod='minmax',delay_quant=0,
+                use_global_stats=False, fix_gamma=False):
     num_unit = len(units)
     assert (num_unit == num_stage)
-
+    print('units:{}, num_stage:{}, filter_list:{}, num_classes:{}, data_type:{}, bottle_neck:{},'
+          'bn_mom:{}, is_train:{}, quant_mod:{}, delay_quant:{}'.format(
+        units, num_stage, filter_list, num_classes, data_type, bottle_neck,
+        bn_mom, is_train, quant_mod, delay_quant
+    ))
     data = mx.sym.Variable(name='data')
     if data_type == 'float32':
         data = mx.sym.identity(data=data, name='id')
@@ -132,7 +143,7 @@ def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_ne
         body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(7, 7), stride=(2, 2), pad=(3, 3),
                                   no_bias=True, name="conv0", workspace=workspace, weight=weight_q)
         body = mx.sym.BatchNorm(data=body, eps=eps, momentum=bn_mom, name='bn0',
-                                use_global_stats=use_global_stats, fix_gamma=fix_gamma)
+                                fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         body = mx.sym.Activation(data=body, act_type='relu', name='relu0')
         body = mx.sym.Quantization_int8(data=body, name="relu0_quant",
                                         is_weight=False, ema_decay=0.99, delay_quant=delay_quant,
@@ -150,12 +161,14 @@ def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_ne
     for i in range(num_stage):
         body = residual_unit_int8(body, filter_list[i], filter_list[i + 1], (1 if i == 0 else 2, 1 if i == 0 else 2), False,
                              name='stage%d_unit%d' % (i + 1, 1), bottle_neck=bottle_neck, workspace=workspace,
-                             memonger=memonger)
-        for j in range(units[i] - 1):
+                             memonger=memonger, is_train=is_train, quant_mod=quant_mod,
+                                  delay_quant=delay_quant, fix_gamma=fix_gamma,
+                                  use_global_stats=use_global_stats)
+        for j in range(int(units[i] - 1)):
             body = residual_unit_int8(body, filter_list[i + 1], filter_list[i + 1], (1, 1), True, name='stage%d_unit%d' % (i + 1, j + 2),
                                  bottle_neck=bottle_neck, workspace=workspace, memonger=memonger)
     bn1 = mx.sym.BatchNorm(data=body, eps=eps, momentum=bn_mom, name='bn1',
-                                use_global_stats=use_global_stats, fix_gamma=fix_gamma)
+                                fix_gamma=fix_gamma, use_global_stats=use_global_stats)
     relu1 = mx.sym.Activation(data=bn1, act_type='relu', name='relu1')
 
     relu1 = mx.sym.Quantization_int8(data=relu1, name="relu1_quant",
