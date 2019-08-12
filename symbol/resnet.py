@@ -64,6 +64,8 @@ def resnet(units, num_stage, filter_list, num_classes, data_type, bottle_neck=Tr
     elif data_type == 'float16':
         data = mx.sym.Cast(data=data, dtype=np.float16)
 
+    data = mx.sym.BatchNorm(data=data, fix_gamma=True, eps=2e-5, momentum=bn_mom, name='bn_data')
+
     if dataset_type == 'imagenet':
         body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(7, 7), stride=(2, 2), pad=(3, 3),
                                   no_bias=True, name="conv0", workspace=workspace)
