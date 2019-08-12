@@ -94,6 +94,7 @@ def main(config):
                                       grad_scale=config.grad_scale,
                                       memonger=config.memonger,
                                       dataset_type=config.dataset,
+                                      is_train=config.is_train,
                                       quant_mod=config.quant_mod,
                                       delay_quant=config.delay_quant,
                                       use_global_stats=config.use_global_stats,
@@ -116,6 +117,13 @@ def main(config):
                                       bottle_neck=config.bottle_neck)
     elif config.network == 'vgg16' or config.network == 'mobilenet' or config.network == 'shufflenet':
         symbol = eval(config.network)(num_classes=config.num_classes)
+    elif config.network == 'mobilenet_int8':
+        symbol = eval(config.network)(num_classes=config.num_classes,
+                                      is_train=config.is_train,
+                                      quant_mod=config.quant_mod,
+                                      delay_quant=config.delay_quant,
+                                      use_global_stats=config.use_global_stats,
+                                      fix_gamma=config.fix_gamma)
 
 
     # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
