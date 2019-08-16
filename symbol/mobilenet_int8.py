@@ -41,15 +41,15 @@ def Conv(data, num_filter=1, channel=1, kernel=(1, 1), stride=(1, 1), pad=(0, 0)
     weight_conv = mx.sym.Variable(name=name_prefix + "_conv2d_weight", shape=(num_filter, channel//num_group, kernel[0], kernel[1]))
     weight_conv_q = mx.sym.Quantization_int8(weight_conv, name=name_prefix + "_conv2d_weight_quant",
                                               is_weight=True, quant_mod=quant_mod)
-    conv = mx.sym.Convolution(data=data, num_filter=num_filter, kernel=kernel, num_group=num_group,
+    data_q = mx.sym.Quantization_int8(data=data, name=name_prefix + "_data_quant",
+                                       is_weight=False, ema_decay=0.99, delay_quant=delay_quant,
+                                       is_train=is_train, quant_mod=quant_mod)
+    conv = mx.sym.Convolution(data=data_q, num_filter=num_filter, kernel=kernel, num_group=num_group,
                               stride=stride, pad=pad, no_bias=True, name='%s%s_conv2d' % (name, suffix),
                               weight=weight_conv_q)
     bn = mx.sym.BatchNorm(data=conv, name='%s%s_batchnorm' % (name, suffix), fix_gamma=True)
     act = mx.sym.Activation(data=bn, act_type='relu', name='%s%s_relu' % (name, suffix))
-    relu_q = mx.sym.Quantization_int8(data=act, name=name_prefix + "_relu_quant",
-                                       is_weight=False, ema_decay=0.99, delay_quant=delay_quant,
-                                       is_train=is_train, quant_mod=quant_mod)
-    return relu_q
+    return act
 
 
 def Conv_DPW(data, depth=1, stride=(1, 1), name='', idx=0, suffix=''):
@@ -100,6 +100,7 @@ def mobilenet_int8(num_classes, alpha=1, resolution=224, is_train=True, quant_mo
     base = int(32 * alpha)
 
     data = mx.symbol.Variable(name="data")  # 224
+
     depth = base  # 32*alpha
     conv_1 = Conv(data, num_filter=depth, channel=3, kernel=(3, 3), pad=(1, 1), stride=(2, 2), name="conv_1",
                   is_train=is_train, quant_mod=quant_mod, delay_quant=delay_quant)  # 224/112
@@ -177,6 +178,15 @@ def mobilenet_int8(num_classes, alpha=1, resolution=224, is_train=True, quant_mo
     pool_size = int(resolution / 32)
     pool = mx.sym.Pooling(data=conv_14, kernel=(pool_size, pool_size), stride=(1, 1), pool_type="avg", name="global_pool")
     flatten = mx.sym.Flatten(data=pool, name="flatten")
-    fc = mx.symbol.FullyConnected(data=flatten, num_hidden=num_classes, name='fc')
+    # # add quantize for fc
+    fc_weight = mx.sym.Variable(name="fc_weight", shape=(num_classes, depth))
+    fc_q = mx.sym.Quantization_int8(fc_weight, name="fc_weight_quant",
+                                              is_weight=True, quant_mod=quant_mod)
+    fc_data_q = mx.sym.Quantization_int8(data=flatten, name="fc_data_quant",
+                                       is_weight=False, ema_decay=0.99, delay_quant=delay_quant,
+                                       is_train=is_train, quant_mod=quant_mod)
+    fc = mx.symbol.FullyConnected(data=fc_data_q, num_hidden=num_classes, name='fc', weight=fc_q)
+    # fc = mx.symbol.FullyConnected(data=flatten, num_hidden=num_classes, name='fc')
+
     softmax = mx.symbol.SoftmaxOutput(data=fc, name='softmax')
     return softmax
