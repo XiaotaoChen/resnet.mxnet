@@ -39,8 +39,7 @@ alpha_values = [0.25, 0.50, 0.75, 1.0]
 
 def Conv(data, num_filter=1, channel=1, kernel=(1, 1), stride=(1, 1), pad=(0, 0), num_group=1, name='', suffix='',
          quant_mod='minmax', delay_quant=0, is_weight_perchannel=False):
-    name_prefix = '%s%s' % (name, suffix)
-    conv = quant_conv(name=name_prefix, data=data, num_filter=num_filter, kernel=kernel, num_group=num_group,
+    conv = quant_conv(name='%s%s_conv2d' % (name, suffix), data=data, num_filter=num_filter, kernel=kernel, num_group=num_group,
                       stride=stride, pad=pad, no_bias=True, dilate=(1,1), quant_mod=quant_mod, 
                       delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel)
 
