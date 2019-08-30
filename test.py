@@ -6,6 +6,7 @@ from config.edict_config import config
 import mxnet as mx
 from data import imagenet_iterator
 
+from symbol.quant_ops import *
 
 def main(config):
     symbol, arg_params, aux_params = mx.model.load_checkpoint('./model/' + config.model_load_prefix, config.model_load_epoch)
