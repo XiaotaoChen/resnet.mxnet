@@ -17,10 +17,9 @@ class Quantization_int8(mx.operator.CustomOp):
         if self.is_weight:
             data = mx.nd.abs(in_data[0])
             if self.is_weight_perchannel:
-                channels = data.shape[0]
-                target_shape = (channels,) + (1,) * len(data.shape[1:])
-                splited_data = mx.nd.split(data, num_outputs=channels, axis=0)
-                maxs = mx.nd.array([mx.nd.max(channel_data).asscalar() for channel_data in splited_data])
+                target_shape = (data.shape[0],) + (1,) * len(data.shape[1:])
+                reduce_axis = tuple([i for i in range(len(data.shape))])
+                maxs = mx.nd.max(data, axis=reduce_axis[1:])
                 quant_unit = maxs / self.QUANT_LEVEL
                 quant_unit = quant_unit.reshape(target_shape).broadcast_like(in_data[0])
             else:
