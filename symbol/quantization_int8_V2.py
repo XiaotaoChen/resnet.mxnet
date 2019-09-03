@@ -420,15 +420,15 @@ def flod_bn(name, data,
     if is_weight_perchannel:
         assert quant_mod == "minmax", "currenet weight perchannel only support minmax node with weight"
     input_channel = get_sym_output_channel(name, data, data_shape=data_shape)
-    weight = mx.sym.Variable(name=name + "_weight", shape=(num_filter, input_channel // num_group, 
+    weight = mx.sym.Variable(name=name + "_conv2d_weight", shape=(num_filter, input_channel // num_group, 
                              kernel[0], kernel[1]), dtype="float32")
-    bn_gamma_var = mx.symbol.Variable(name + '_bn_gamma', shape=(input_channel,), dtype="float32")
-    bn_beta_var = mx.symbol.Variable(name + '_bn_beta', shape=(input_channel,), dtype="float32")
+    bn_gamma_var = mx.symbol.Variable(name + '_batchnorm_gamma', shape=(input_channel,), dtype="float32")
+    bn_beta_var = mx.symbol.Variable(name + '_batchnorm_beta', shape=(input_channel,), dtype="float32")
 
     # conv + bn
-    conv = mx.sym.Convolution(data=data, weight=weight, num_filter=num_filter, kernel=kernel, num_group=num_group, 
+    conv = mx.sym.Convolution(name=name + "_conv2d", data=data, weight=weight, num_filter=num_filter, kernel=kernel, num_group=num_group, 
                               stride=stride, pad=pad, no_bias=no_bias, dilate=dilate)
-    bn_output_var, bn_mean_var, bn_var_var = mx.sym.BatchNorm(data=conv, gamma=bn_gamma_var, beta=bn_beta_var, 
+    bn_output_var, bn_mean_var, bn_var_var = mx.sym.BatchNorm(name=name + "_batchnorm", data=conv, gamma=bn_gamma_var, beta=bn_beta_var, 
                           eps=eps, momentum=momentum, fix_gamma=fix_gamma, output_mean_var=True)
     # flod bn
     flod_bn = mx.sym.Custom(data=data, weight=weight, bn_output=bn_output_var, bn_gamma=bn_gamma_var, 

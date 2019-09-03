@@ -11,7 +11,7 @@ config.network = "mobilenet_int8_flodbn"
 config.depth = 50 if config.dataset == 'imagenet' else 50
 config.model_load_epoch = 80
 # config.model_prefix = config.network + '_' + config.dataset
-config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_perchannel'
+config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_pertensor'
 config.model_load_prefix = 'mobilenet/mobilenet'  # 'resnet50_new/resnet_imagenet'
 config.retrain = True
 config.use_global_stats=False
