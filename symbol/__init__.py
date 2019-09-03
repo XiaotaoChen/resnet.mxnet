@@ -5,3 +5,4 @@ from .resnet_mxnet import resnet_mxnet
 from .resnet_int8 import resnet_int8
 from .mobilenet import mobilenet
 from .mobilenet_int8 import mobilenet_int8
+from .mobilenet_int8_flodbn import mobilenet_int8_flodbn

@@ -124,9 +124,14 @@ def main(config):
                                       is_weight_perchannel=config.is_weight_perchannel,
                                       use_global_stats=config.use_global_stats,
                                       fix_gamma=config.fix_gamma)
-
+    elif config.network == 'mobilenet_int8_flodbn':
+        symbol = eval(config.network)(num_classes=config.num_classes,
+                                      quant_mod=config.quant_mod,
+                                      delay_quant=config.delay_quant,
+                                      is_weight_perchannel=config.is_weight_perchannel)
 
     # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
+    # symbol.save(config.network + ".json")
     # import sys
     # sys.exit()
 

@@ -7,7 +7,7 @@ config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
 #config.gpu_list = [0, 1, 2, 3]
 config.platform = "aliyun"
 config.dataset = "imagenet" # imagenet or cifar10
-config.network = "mobilenet_int8"
+config.network = "mobilenet_int8_flodbn"
 config.depth = 50 if config.dataset == 'imagenet' else 50
 config.model_load_epoch = 80
 # config.model_prefix = config.network + '_' + config.dataset
@@ -20,7 +20,7 @@ config.fix_gamma=False
 config.quant_mod = 'minmax'
 config.delay_quant = 0
 config.allow_missing = True
-config.is_weight_perchannel = True
+config.is_weight_perchannel = False
 
 # data
 if config.platform == 'truenas':
