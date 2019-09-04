@@ -6,7 +6,8 @@ from config.edict_config import config
 import mxnet as mx
 from data import imagenet_iterator
 
-from symbol.quant_ops import *
+# from symbol.quant_ops import *
+from symbol.quantization_int8_V2 import *
 
 def main(config):
     symbol, arg_params, aux_params = mx.model.load_checkpoint('./model/' + config.model_load_prefix, config.model_load_epoch)
@@ -17,6 +18,7 @@ def main(config):
                                   batch_size=config.batch_size,
                                   kv=kv,
                                   image_shape=tuple(config.image_shape))
+    val = mx.io.ResizeIter(val, 10000)
     print(model.score(val))
 
 
