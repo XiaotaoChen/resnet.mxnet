@@ -134,9 +134,11 @@ class AddBiasProp(mx.operator.CustomOpProp):
         return Add_Bias()
 
 
-class Flod_BN(mx.operator.CustomOp):
+class Fold_BN(mx.operator.CustomOp):
     def __init__(self, quant_mode, is_weight_perchannel, delay_quant, ema_decay,
-                 name, num_filter, num_group, kernel, stride, pad, dilate, no_bias, eps, momentum, fix_gamma):
+                 name, num_filter, num_group, kernel, stride, pad, dilate, no_bias, 
+                 eps, momentum, fix_gamma, total_params_path, params_prefix,
+                 quantize_flag):
         self.quant_mode = quant_mode
         self.is_weight_perchannel = is_weight_perchannel
         self.delay_quant = delay_quant
@@ -156,19 +158,40 @@ class Flod_BN(mx.operator.CustomOp):
         self.eps = eps
         self.momentum = momentum
         self.fix_gamma = fix_gamma
+        # for inference
+        self.total_params_path = total_params_path
+        import os
+        self.params_prefix = params_prefix
+        if os.path.exists(self.total_params_path):
+            params = mx.nd.load(self.total_params_path)
+            self.mean = params["aux:{}_batchnorm_moving_mean".format(self.params_prefix)
+                              ].as_in_context(mx.gpu(0))
+            self.var = params["aux:{}_batchnorm_moving_var".format(self.params_prefix)
+                             ].as_in_context(mx.gpu(0))
+        else:
+            self.mean = None
+            self.var = None
         # for debug
-        self.quantize_flag = True
+        self.quantize_flag = quantize_flag
+        # print("[added by cxt] quantize flag:{}, params_prefix:{}, params_path:{}".format(
+        #       self.quantize_flag, self.params_prefix, self.total_params_path))
 
     def forward(self, is_train, req, in_data, out_data, aux):
-        assert len(in_data) == 7, "flod bn require six inputs: data, weight, bn_input, bn_gamma, bn_beta, bn_mean, bn_var"
+        assert len(in_data) == 7, "fold bn require six inputs: data, weight, bn_input, bn_gamma, bn_beta, bn_mean, bn_var"
         data = in_data[0]
         weight = in_data[1]
         bn_gamma = in_data[3]
         bn_beta = in_data[4]
         bn_mean = in_data[5]
         bn_var = in_data[6]
-
-        # the bn_var seems like wrong, we should to forward convolution to calculate the conv_var
+        if is_train and self.delay_quant > 0:
+            # assign bn output to output
+            self.assign(out_data[0], req[0], in_data[2])
+            self.delay_quant -= 1
+            return
+        """
+        in train mode, the bn_var seems like wrong, we should to forward convolution to calculate the conv_var;
+        """
         conv = mx.nd.Convolution(
             name=self.name,
             data=data,
@@ -181,16 +204,24 @@ class Flod_BN(mx.operator.CustomOp):
             no_bias=self.no_bias,
             weight=weight
         )
-        bn_var = mx.nd.mean(mx.nd.square(conv - bn_mean.reshape(1,conv.shape[1],1,1)), axis=(0,2,3))
+        if is_train > 0:
+            # in training mode, bn_var is not correct from BatchNorm
+            bn_var = mx.nd.mean(mx.nd.square(conv - bn_mean.reshape(1,conv.shape[1],1,1)), axis=(0,2,3))
+        else:
+            # in inference mode, bn_mean, bn_mean both aren't correct from BatchNorm, We should read from the params file
+            assert self.mean is not None and self.var is not None, "in \
+                   inference mode must offer mean,var to avoid the BatchNorm bug"
+            assert bn_mean.shape == self.mean.shape and \
+                   bn_var.shape == self.var.shape, "{} the mean or var shape \
+                   is not match".format(self.name)
+            bn_mean = self.mean.as_in_context(bn_mean.context)
+            bn_var = self.var.as_in_context(bn_var.context)
+        
+        # check_fold_bn_consistence(bn_output=in_data[2], data=in_data[0], weight=weight,
+        #                           bn_gamma=bn_gamma, bn_beta=bn_beta, bn_mean=bn_mean, bn_var=bn_var,
+        #                           num_filter=self.num_filter, kernel=self.kernel, num_group=self.num_group, 
+        #                           stride=self.stride, pad=self.pad, dilate=self.dilate, no_bias=self.no_bias)
 
-        # check_flod_bn_consistence(bn_output=in_data[2], data=in_data[0], weight=weight,
-        #                           bn_gamma=bn_gamma, bn_beta=bn_beta, bn_mean=bn_mean, bn_var=bn_var)
-
-        if is_train and self.delay_quant > 0:
-            # assign bn output to output
-            self.assign(out_data[0], req[0], in_data[2])
-            self.delay_quant -= 1
-            return
         if self.quantize_flag:
             # quantize input
             if is_train:
@@ -243,11 +274,11 @@ class Flod_BN(mx.operator.CustomOp):
 
         # flod bn to add beta -  gamma* mean/sqrt(var + eps)
         bias = bn_beta -  bn_mean * bn_gamma / mx.nd.sqrt(bn_var + self.eps)
-        # bias = bn_beta -  bn_mean * factor
+        # bias = bn_beta -  bn_mean * factor # this method will cause error.
         target_shape = (1, conv.shape[1], 1, 1)
         bias = bias.reshape(target_shape)
-        # flod_bn_result = conv + bias
-        # print("flod bn err:{}".format(np.linalg.norm(flod_bn_result.asnumpy() - in_data[2].asnumpy())))
+        # fold_bn_result = conv + bias
+        # print("{} flod bn err:{}".format(self.params_prefix, np.linalg.norm(fold_bn_result.asnumpy() - in_data[2].asnumpy())))
 
         self.assign(out_data[0], req[0], conv + bias)
 
@@ -259,11 +290,12 @@ class Flod_BN(mx.operator.CustomOp):
             # print("{}:{},{}, sum:{}".format(i, in_data[i].shape, in_grad[i].shape, mx.nd.sum(in_grad[i])))
         self.assign(in_grad[2], req[2], out_grad[0])
 
-@mx.operator.register("Flod_BN")
-class FlodBNProp(mx.operator.CustomOpProp):
+@mx.operator.register("Fold_BN")
+class FoldBNProp(mx.operator.CustomOpProp):
     def __init__(self, quant_mode, is_weight_perchannel=False, delay_quant=0, ema_decay=0.99,
-                 name="flod_bn", num_filter=None, num_group=None, kernel=(3,3), stride=(1,1), 
-                 pad=(0,0), dilate=(1,1), no_bias=True, eps=1e-5, momentum=0.9, fix_gamma=False):
+                 name='fold_bn', num_filter=None, num_group=None, kernel=(3,3), stride=(1,1), 
+                 pad=(0,0), dilate=(1,1), no_bias=True, eps=1e-5, momentum=0.9, 
+                 fix_gamma=False, total_params_path="None",params_prefix="None", quantize_flag="True"):
         self.quant_mode = str(quant_mode)
         self.delay_quant = int(delay_quant)
         self.ema_decay = float(ema_decay)
@@ -281,8 +313,13 @@ class FlodBNProp(mx.operator.CustomOpProp):
         self.eps = float(eps)
         self.momentum = float(momentum)
         self.fix_gamma = eval(fix_gamma)
+        self.total_params_path = str(total_params_path)
+        self.params_prefix = params_prefix
+        # for debug
+        self.quantize_flag = eval(quantize_flag)
 
-        super(FlodBNProp, self).__init__(True)
+
+        super(FoldBNProp, self).__init__(True)
     def list_arguments(self):
         return ['data', 'weight', 'bn_output', 'bn_gamma', 'bn_beta',  'bn_mean', 'bn_var']
     def list_outputs(self):
@@ -311,9 +348,11 @@ class FlodBNProp(mx.operator.CustomOpProp):
         return in_type, [in_type[0]]*len(self.list_outputs()), \
             [in_type[0]]*len(self.list_auxiliary_states())
     def create_operator(self, ctx, shapes, dtypes):
-        return Flod_BN(self.quant_mode, self.is_weight_perchannel, self.delay_quant, self.ema_decay,
+        return Fold_BN(self.quant_mode, self.is_weight_perchannel, self.delay_quant, self.ema_decay,
                        self.name, self.num_filter, self.num_group, self.kernel, self.stride, self.pad, 
-                       self.dilate, self.no_bias, self.eps, self.momentum, self.fix_gamma)
+                       self.dilate, self.no_bias, self.eps, self.momentum, self.fix_gamma, 
+                       self.total_params_path, self.params_prefix,
+                       self.quantize_flag)
 
 
 @mx.init.register
@@ -326,13 +365,12 @@ class CustomInit(mx.init.Initializer):
         arr[:] = self.data
 
 def get_sym_output_channel(name, sym, data_shape=(1, 3, 224, 224)):
-    print("[added by cxt] data_shape:{}".format(data_shape))
     _, out_shapes, _ = sym.infer_shape(data=data_shape)
     assert len(out_shapes) == 1, 'the output of sym is not equal to 1'
     # print('sym:{}:{}'.format(name, sym))
     return out_shapes[0][1]
 
-def quant_conv(name, data, num_filter, kernel, stride, pad=(0,0), no_bias=True, dilate=(1,1), num_group=1,
+def quant_conv(name, data, num_filter, kernel, stride, pad=(0,0), no_bias=False, dilate=(1,1), num_group=1,
                quant_mod='minmax', delay_quant=0, is_weight_perchannel=False, data_shape=(1,3,224,224)):
     if is_weight_perchannel:
         assert quant_mod == "minmax", "currenet weight perchannel only support minmax node with weight"
@@ -374,15 +412,29 @@ def quant_fc(name, data, num_hidden, quant_mod='minmax', delay_quant=0, is_weigh
     fc = mx.symbol.FullyConnected(data=fc_data_q, num_hidden=num_hidden, name='fc', weight=fc_q)
     return fc
 
-def check_flod_bn_consistence(bn_output, data, weight, bn_gamma, bn_beta, bn_mean, bn_var):
+def quant_deconv(name, data, kernel, stride, pad, num_filter, no_bias=True, cudnn_tune='fastest', 
+                 quant_mod='minmax', delay_quant=0, is_weight_perchannel=False, data_shape=(1,3,224,224)):
+    if is_weight_perchannel:
+        assert quant_mod == "minmax", "currenet weight perchannel only support minmax node with weight"
+    input_channel = get_sym_output_channel(name, data, data_shape=data_shape)
+    weight = mx.sym.Variable(name=name + "_weight", shape=(input_channel, num_filter,
+                                    kernel[0], kernel[1]), dtype="float32")
+    weight_q = mx.sym.Custom(data=weight, name = name + "_weight_quant", quant_mode=quant_mod, is_weight=True,
+                             is_weight_perchannel = is_weight_perchannel, ema_decay=0.99, delay_quant=delay_quant, 
+                             op_type="Quantization_int8_V2")
+    data_q = mx.sym.Custom(data=data, name = name + "_data_quant", quant_mode=quant_mod, is_weight=False,
+                             is_weight_perchannel = False, ema_decay=0.99, delay_quant=delay_quant, 
+                             op_type="Quantization_int8_V2")
+    deconv = mx.symbol.Deconvolution(name=name, data=data_q, kernel=kernel,stride=stride,pad=pad,
+                                   no_bias=no_bias ,num_filter=num_filter,cudnn_tune=cudnn_tune,
+                                   weight=weight_q)
+    return deconv
+
+
+def check_fold_bn_consistence(bn_output, data, weight, bn_gamma, bn_beta, bn_mean, bn_var,
+                              num_filter=4, kernel=(3,3), num_group=1, 
+                              stride=(1,1), pad=(0,0), dilate=(1,1), no_bias=True):
     name = 'check'
-    num_filter = 4
-    kernel = (3,3)
-    stride = (1,1)
-    pad = (0,0)
-    dilate = (1,1)
-    no_bias = True
-    num_group = 1
     eps = 1e-5
 
     w_target_shape = (weight.shape[0],) + (1,) * len(weight.shape[1:])
@@ -405,17 +457,22 @@ def check_flod_bn_consistence(bn_output, data, weight, bn_gamma, bn_beta, bn_mea
     bias = bn_beta -  bn_gamma * bn_mean / mx.nd.sqrt(bn_var + eps)
     target_shape = (1, conv.shape[1], 1, 1)
     bias = bias.reshape(target_shape)
-    flod_bn_result = conv + bias
+    fold_bn_result = conv + bias
 
-    print("bn err:{}".format(np.linalg.norm(flod_bn_result.asnumpy() - bn_output.asnumpy())))
+    # print("bn err:{}".format(np.linalg.norm(fold_bn_result.asnumpy() - bn_output.asnumpy())))
+    # raise NotImplementedError
 
-def flod_bn(name, data, 
+
+def fold_bn(name, data, 
             # quant params
             quant_mod='minmax', is_weight_perchannel=False, delay_quant=0, ema_decay=0.99,
             # conv params
             num_filter=None, kernel=None, stride=None, pad=(0,0), no_bias=True, dilate=(1,1), num_group=1,
             # bn params
-            eps=1e-5, momentum=0.9, fix_gamma=False,
+            eps=1e-5, momentum=0.9, fix_gamma=False, use_global_stats=False,
+            total_params_path=None,
+            #for debug
+            quantize_flag=True,
             data_shape=(1,3,224,224)):
     if is_weight_perchannel:
         assert quant_mod == "minmax", "currenet weight perchannel only support minmax node with weight"
@@ -429,10 +486,11 @@ def flod_bn(name, data,
     conv = mx.sym.Convolution(name=name + "_conv2d", data=data, weight=weight, num_filter=num_filter, kernel=kernel, num_group=num_group, 
                               stride=stride, pad=pad, no_bias=no_bias, dilate=dilate)
     bn_output_var, bn_mean_var, bn_var_var = mx.sym.BatchNorm(name=name + "_batchnorm", data=conv, gamma=bn_gamma_var, beta=bn_beta_var, 
-                          eps=eps, momentum=momentum, fix_gamma=fix_gamma, output_mean_var=True)
+                          eps=eps, momentum=momentum, fix_gamma=fix_gamma, output_mean_var=True, use_global_stats=use_global_stats)
     # flod bn
-    flod_bn = mx.sym.Custom(data=data, weight=weight, bn_output=bn_output_var, bn_gamma=bn_gamma_var, 
-                            bn_beta=bn_beta_var, bn_mean=bn_mean_var, bn_var=bn_var_var, name = name + "_flod_bn", 
+    # the argument `name` seems like can't pass to Custom op, so create new arg: params_prefix
+    fold_bn = mx.sym.Custom(name=name + "_fold_bn", data=data, weight=weight, bn_output=bn_output_var, bn_gamma=bn_gamma_var, 
+                            bn_beta=bn_beta_var, bn_mean=bn_mean_var, bn_var=bn_var_var, 
                             # quant params
                             quant_mode=quant_mod, is_weight_perchannel = is_weight_perchannel, 
                             delay_quant=0, ema_decay=ema_decay, 
@@ -441,8 +499,11 @@ def flod_bn(name, data,
                             dilate=dilate, no_bias=no_bias,
                             # bn params
                             eps=eps, momentum=momentum, fix_gamma=fix_gamma,
-                            op_type="Flod_BN")
-    return flod_bn
+                            total_params_path=total_params_path, params_prefix=name,
+                            # for debug
+                            quantize_flag=quantize_flag,
+                            op_type="Fold_BN")
+    return fold_bn
     
     
 

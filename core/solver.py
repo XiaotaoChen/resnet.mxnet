@@ -6,6 +6,10 @@ from mxnet.module import Module
 from mxnet import metric
 #from mxnet.model import BatchEndParam
 from .callback import BatchEndParam
+import sys
+sys.path.append("../")
+from symbol import *
+
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -34,7 +38,10 @@ def _as_list(obj):
 class Solver(object):
     def __init__(self, symbol, data_names, label_names,
                  data_shapes, label_shapes, logger=logging,
-                 context=mx.cpu(), work_load_list=None, fixed_param_names=None, allow_missing=False):
+                 context=mx.cpu(), work_load_list=None, fixed_param_names=None, allow_missing=False,
+                 # for evaluate fold bn to create eval symbol
+                 config=None
+                 ):
         self.symbol = symbol
         self.data_names = data_names
         self.label_names = label_names
@@ -52,6 +59,8 @@ class Solver(object):
                              label_names=self.label_names, logger=self.logger,
                              context=self.context, work_load_list=self.work_load_list,
                              fixed_param_names=self.fixed_param_names)
+        # for fold bn 
+        self.config = config
 
     def fit(self, train_data, eval_data=None,
             eval_metric='acc', validate_metric=None,
@@ -100,8 +109,6 @@ class Solver(object):
             end_of_batch = False
             next_data_batch = next(data_iter)
             while not end_of_batch:
-            # while temp_count <= 1000:
-                # ndarray.waitall()
                 start_time = time.time()
                 data_batch = next_data_batch
 
@@ -167,11 +174,38 @@ class Solver(object):
                 for callback in _as_list(epoch_end_callback):
                     callback(epoch, self.symbol, arg_params, aux_params)
             if eval_data:
-                res = self.module.score(eval_data, validate_metric,
-                                        score_end_callback=None,
-                                        batch_end_callback=None,
-                                        reset=True,
-                                        epoch=epoch)
+                if "foldbn" not in self.config.network:
+                    res = self.module.score(eval_data, validate_metric,
+                                            score_end_callback=None,
+                                            batch_end_callback=None,
+                                            reset=True,
+                                            epoch=epoch)
+                else:
+                    # for fold bn to create inference symbol
+                    total_params_path = "./model/%s-%04d.params"%(self.config.model_prefix, epoch+1)
+                    # total_params_path = "./model/mobilenet_flodbn_0904/mobilenet_int8_flodbn_imagenet_retrain_80_pertensor-fold-0100.params"
+                    # _, arg_params, aux_params = mx.model.load_checkpoint('./model/mobilenet_flodbn_0904/mobilenet_int8_flodbn_imagenet_retrain_80_pertensor-fold', 100)
+                    import os
+                    assert os.path.exists(total_params_path), "please provide the correct total_params_path for foldbn eval"
+                    eval_sym = eval(self.config.network)(num_classes=self.config.num_classes,
+                                      quant_mod=self.config.quant_mod,
+                                      delay_quant=self.config.delay_quant,
+                                      is_weight_perchannel=self.config.is_weight_perchannel,
+                                      total_params_path=total_params_path,
+                                      quantize_flag=self.config.quantize_flag)
+                    eval_module = Module(symbol=eval_sym, data_names=self.data_names,
+                             label_names=self.label_names, logger=self.logger,
+                             context=self.context, work_load_list=self.work_load_list,
+                             fixed_param_names=self.fixed_param_names)
+                    eval_module.bind(data_shapes=self.data_shapes, label_shapes=self.label_shapes, for_training=False)
+                    eval_module.init_params(initializer=initializer,
+                                            arg_params=arg_params,
+                                            aux_params=aux_params)
+                    res = eval_module.score(eval_data, validate_metric,
+                                            score_end_callback=None,
+                                            batch_end_callback=None,
+                                            reset=True,
+                                            epoch=epoch)
                 for name, val in res:
                     self.logger.info('Epoch[%d] Validation-%s=%f', epoch, name, val)
 

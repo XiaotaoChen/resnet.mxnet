@@ -124,11 +124,13 @@ def main(config):
                                       is_weight_perchannel=config.is_weight_perchannel,
                                       use_global_stats=config.use_global_stats,
                                       fix_gamma=config.fix_gamma)
-    elif config.network == 'mobilenet_int8_flodbn':
+    elif config.network == 'mobilenet_int8_foldbn':
         symbol = eval(config.network)(num_classes=config.num_classes,
                                       quant_mod=config.quant_mod,
                                       delay_quant=config.delay_quant,
-                                      is_weight_perchannel=config.is_weight_perchannel)
+                                      is_weight_perchannel=config.is_weight_perchannel,
+                                      total_params_path=None,
+                                      quantize_flag=config.quantize_flag)
 
     # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
     # symbol.save(config.network + ".json")
@@ -221,7 +223,9 @@ def main(config):
                     data_shapes=data_shapes,
                     label_shapes=label_shapes,
                     logger=logging,
-                    context=devs)
+                    context=devs,
+                    # for evaluate fold bn
+                    config=config)
     epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.model_prefix)
     # epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.network)
     batch_end_callback = mx.callback.Speedometer(config.batch_size, config.frequent)
@@ -246,8 +250,7 @@ def main(config):
                begin_epoch=config.begin_epoch,
                num_epoch=config.num_epoch,
                kvstore=kv,
-               allow_missing=config.allow_missing
-               )
+               allow_missing=config.allow_missing)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train Faster R-CNN network')

@@ -7,12 +7,12 @@ config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
 #config.gpu_list = [0, 1, 2, 3]
 config.platform = "aliyun"
 config.dataset = "imagenet" # imagenet or cifar10
-config.network = "mobilenet_int8_flodbn"
+config.network = "mobilenet_int8_foldbn"
 config.depth = 50 if config.dataset == 'imagenet' else 50
-config.model_load_epoch = 100
+config.model_load_epoch = 80
 # config.model_prefix = config.network + '_' + config.dataset
-config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_pertensor'
-config.model_load_prefix = 'mobilenet_flodbn_0904/mobilenet_int8_flodbn_imagenet_retrain_80_pertensor'  # 'resnet50_new/resnet_imagenet'
+config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_pertensor_quant_0908'
+config.model_load_prefix = 'mobilenet/mobilenet'  # 'resnet50_new/resnet_imagenet'
 config.retrain = True
 config.use_global_stats=False
 config.fix_gamma=False
@@ -21,6 +21,9 @@ config.quant_mod = 'minmax'
 config.delay_quant = 0
 config.allow_missing = True
 config.is_weight_perchannel = False
+# for fold bn
+config.total_params_path = "./model/%s-%04d.params"%(config.model_load_prefix, config.model_load_epoch)
+config.quantize_flag = True
 
 # data
 if config.platform == 'truenas':
