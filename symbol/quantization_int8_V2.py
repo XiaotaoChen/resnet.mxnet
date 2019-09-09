@@ -225,8 +225,8 @@ class Fold_BN(mx.operator.CustomOp):
         if self.quantize_flag:
             # quantize input
             if is_train:
-                data = mx.nd.abs(in_data[0])
-                maxs = mx.nd.max(data)
+                data_abs = mx.nd.abs(in_data[0])
+                maxs = mx.nd.max(data_abs)
                 # udpate acativation maxs
                 if self.init:
                     aux[0][:] = maxs
@@ -261,7 +261,7 @@ class Fold_BN(mx.operator.CustomOp):
         # conv
         conv = mx.nd.Convolution(
             name=self.name,
-            data=in_data[0],
+            data=data,
             num_filter=self.num_filter,
             kernel=self.kernel,
             num_group=self.num_group,

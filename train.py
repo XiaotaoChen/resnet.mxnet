@@ -193,6 +193,7 @@ def main(config):
     else:
         lr = config.lr
         lr_scheduler = None
+    print("begin epoch:{}, num epoch:{}".format(config.begin_epoch, config.num_epoch))
 
     optimizer_params = {
         'learning_rate': lr,
