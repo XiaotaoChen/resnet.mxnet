@@ -131,6 +131,13 @@ def main(config):
                                       is_weight_perchannel=config.is_weight_perchannel,
                                       total_params_path=None,
                                       quantize_flag=config.quantize_flag)
+    elif config.network == 'mobilenet_int8_foldbn_v1':
+        symbol = eval(config.network)(num_classes=config.num_classes,
+                                      quant_mod=config.quant_mod,
+                                      delay_quant=config.delay_quant,
+                                      is_weight_perchannel=config.is_weight_perchannel,
+                                      use_global_stats=config.use_global_stats,
+                                      quantize_flag=config.quantize_flag)
 
     # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
     # symbol.save(config.network + ".json")

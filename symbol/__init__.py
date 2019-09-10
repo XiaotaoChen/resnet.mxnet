@@ -6,3 +6,4 @@ from .resnet_int8 import resnet_int8
 from .mobilenet import mobilenet
 from .mobilenet_int8 import mobilenet_int8
 from .mobilenet_int8_foldbn import mobilenet_int8_foldbn
+from .mobilenet_int8_foldbn_v1 import mobilenet_int8_foldbn_v1

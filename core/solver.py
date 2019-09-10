@@ -174,13 +174,7 @@ class Solver(object):
                 for callback in _as_list(epoch_end_callback):
                     callback(epoch, self.symbol, arg_params, aux_params)
             if eval_data:
-                if "foldbn" not in self.config.network:
-                    res = self.module.score(eval_data, validate_metric,
-                                            score_end_callback=None,
-                                            batch_end_callback=None,
-                                            reset=True,
-                                            epoch=epoch)
-                else:
+                if self.config.network == 'mobilenet_int8_foldbn':
                     # for fold bn to create inference symbol
                     total_params_path = "./model/%s-%04d.params"%(self.config.model_prefix, epoch+1)
                     # total_params_path = "./model/mobilenet_flodbn_0904/mobilenet_int8_flodbn_imagenet_retrain_80_pertensor-fold-0100.params"
@@ -202,6 +196,12 @@ class Solver(object):
                                             arg_params=arg_params,
                                             aux_params=aux_params)
                     res = eval_module.score(eval_data, validate_metric,
+                                            score_end_callback=None,
+                                            batch_end_callback=None,
+                                            reset=True,
+                                            epoch=epoch)
+                else:
+                    res = self.module.score(eval_data, validate_metric,
                                             score_end_callback=None,
                                             batch_end_callback=None,
                                             reset=True,
