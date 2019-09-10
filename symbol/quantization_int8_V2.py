@@ -184,6 +184,9 @@ class Fold_BN(mx.operator.CustomOp):
         bn_beta = in_data[4]
         bn_mean = in_data[5]
         bn_var = in_data[6]
+
+        # print("bn_mean:{}\n bn_var:{}".format(bn_mean, bn_var))
+
         if is_train and self.delay_quant > 0:
             # assign bn output to output
             self.assign(out_data[0], req[0], in_data[2])
@@ -204,7 +207,7 @@ class Fold_BN(mx.operator.CustomOp):
             no_bias=self.no_bias,
             weight=weight
         )
-        if is_train > 0:
+        if is_train:
             # in training mode, bn_var is not correct from BatchNorm
             bn_var = mx.nd.mean(mx.nd.square(conv - bn_mean.reshape(1,conv.shape[1],1,1)), axis=(0,2,3))
         else:
@@ -325,12 +328,13 @@ class FoldBNProp(mx.operator.CustomOpProp):
     def list_outputs(self):
         return ['output']
     def list_auxiliary_states(self):
-        return ["input_minmax", "weight_minmax"]
+        return ["data_minmax", "weight_minmax"]
     def infer_shape(self, in_shape):
         shape = in_shape[0]
         aux_shape = [[1]]
         if self.is_weight_perchannel:
-            aux_shape.append([shape[0]])
+            # weight shape
+            aux_shape.append([in_shape[1][0]])
         else:
             aux_shape.append([1])
         # the batch size
