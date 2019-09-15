@@ -124,6 +124,13 @@ def main(config):
                                       is_weight_perchannel=config.is_weight_perchannel,
                                       use_global_stats=config.use_global_stats,
                                       fix_gamma=config.fix_gamma)
+    elif config.network == 'mobilenet_int8_clipgrad':
+        symbol = eval(config.network)(num_classes=config.num_classes,
+                                      quant_mod=config.quant_mod,
+                                      delay_quant=config.delay_quant,
+                                      is_weight_perchannel=config.is_weight_perchannel,
+                                      use_global_stats=config.use_global_stats,
+                                      fix_gamma=config.fix_gamma)
     elif config.network == 'mobilenet_int8_foldbn':
         symbol = eval(config.network)(num_classes=config.num_classes,
                                       quant_mod=config.quant_mod,

@@ -35,11 +35,18 @@ class Quantization_int8(mx.operator.CustomOp):
             if is_train:
                 data = mx.nd.abs(in_data[0])
                 maxs = mx.nd.max(data)
-                # udpate acativation maxs
-                aux[0][:] = aux[0] * self.ema_decay + maxs * (1 - self.ema_decay)
-            
+                # udpate activation maxs
+                if self.init:
+                    aux[0][:] = maxs
+                    self.init = False
+                else:
+                    aux[0][:] = aux[0] * self.ema_decay + maxs * (1 - self.ema_decay)
             quant_unit = aux[0] / self.QUANT_LEVEL
-            self.assign(out_data[0], req[0], mx.nd.round(in_data[0] / quant_unit) * quant_unit)
+            out_data[0][:] = mx.nd.clip(in_data[0], 
+                                        - aux[0].asnumpy()[0], 
+                                        aux[0].asnumpy()[0])
+            out_data[0][:] = mx.nd.round(out_data[0] / quant_unit) * quant_unit
+            # self.assign(out_data[0], req[0], mx.nd.round(in_data[0] / quant_unit) * quant_unit)
     def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
         self.assign(in_grad[0], req[0], out_grad[0])
 
@@ -402,7 +409,8 @@ def quant_conv(name, data, num_filter, kernel, stride, pad=(0,0), no_bias=False,
     )
     return conv
 
-def quant_fc(name, data, num_hidden, quant_mod='minmax', delay_quant=0, is_weight_perchannel=False, data_shape=(1,3,224,224)):
+def quant_fc(name, data, num_hidden, flatten=True, no_bias=False,
+             quant_mod='minmax', delay_quant=0, is_weight_perchannel=False, data_shape=(1,3,224,224)):
     if is_weight_perchannel:
         assert quant_mod == "minmax", "currenet weight perchannel only support minmax node with weight"
     input_channel = get_sym_output_channel(name, data, data_shape=data_shape)
@@ -413,7 +421,8 @@ def quant_fc(name, data, num_hidden, quant_mod='minmax', delay_quant=0, is_weigh
     fc_data_q = mx.sym.Custom(data=data, name= name + "_data_quant", is_weight=False, ema_decay=0.99, 
                               delay_quant=delay_quant, quant_mode = quant_mod, is_weight_perchannel=False,
                               op_type="Quantization_int8_V2")
-    fc = mx.symbol.FullyConnected(data=fc_data_q, num_hidden=num_hidden, name='fc', weight=fc_q)
+    fc = mx.symbol.FullyConnected(data=fc_data_q, num_hidden=num_hidden, name='fc', weight=fc_q,
+                                  flatten=flatten, no_bias=no_bias)
     return fc
 
 def quant_deconv(name, data, kernel, stride, pad, num_filter, no_bias=True, cudnn_tune='fastest', 
