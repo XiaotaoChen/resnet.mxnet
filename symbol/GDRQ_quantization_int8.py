@@ -11,22 +11,36 @@ class GDRQ_Quantization_int8(mx.operator.CustomOp):
         self.ema_decay = ema_decay
         self.QUANT_LEVEL = 127
         self.init = True
-        assert self.is_weight_perchannel == False, "currently GDRQ only support per tensor quantization"
+        # assert self.is_weight_perchannel == False, "currently GDRQ only support per tensor quantization"
     def forward(self, is_train, req, in_data, out_data, aux):
         if is_train and self.delay_quant > 0:
             self.assign(out_data[0], req[0], in_data[0])
             self.delay_quant -= 1
             return
         if self.is_weight:
-            # save weight thresholds
-            if is_train:
-                thresholds = 2 * mx.nd.mean(mx.nd.abs(in_data[0]))
-                aux[0][:] = thresholds
-            quant_unit = aux[0] / self.QUANT_LEVEL
-            out_data[0][:] = mx.nd.clip(in_data[0], 
-                                        - aux[0].asnumpy()[0], 
-                                        aux[0].asnumpy()[0])
-            out_data[0][:] = mx.nd.round(out_data[0] / quant_unit) * quant_unit
+            if self.is_weight_perchannel:
+                target_shape = (in_data[0].shape[0],) + (1,) * len(in_data[0].shape[1:])
+                # save weight thresholds
+                if is_train:
+                    reduce_axis = tuple([i for i in range(len(in_data[0].shape))])
+                    thresholds = 2 * mx.nd.mean(mx.nd.abs(in_data[0]), axis=reduce_axis[1:])
+                    aux[0][:] = thresholds
+                quant_unit = aux[0] / self.QUANT_LEVEL
+                quant_unit = quant_unit.reshape(target_shape)
+                # the arguments of min/max only support scalar
+                for i in range(in_data[0].shape[0]):
+                    out_data[0][i,:] = mx.nd.clip(in_data[0][i], -aux[0].asnumpy()[i], aux[0].asnumpy()[i])
+                out_data[0][:] = mx.nd.round(out_data[0] /quant_unit)  * quant_unit
+            else:
+                # save weight thresholds
+                if is_train:
+                    thresholds = 2 * mx.nd.mean(mx.nd.abs(in_data[0]))
+                    aux[0][:] = thresholds
+                quant_unit = aux[0] / self.QUANT_LEVEL
+                out_data[0][:] = mx.nd.clip(in_data[0], 
+                                            - aux[0].asnumpy()[0], 
+                                            aux[0].asnumpy()[0])
+                out_data[0][:] = mx.nd.round(out_data[0] / quant_unit) * quant_unit
         else:
             if is_train:
                 thresholds = 2 * mx.nd.mean(mx.nd.abs(in_data[0]))
