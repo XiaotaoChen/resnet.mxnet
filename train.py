@@ -84,7 +84,7 @@ def main(config):
                                       grad_scale=config.grad_scale,
                                       memonger=config.memonger,
                                       dataset_type=config.dataset)
-    elif config.network == 'resnet_int8':
+    elif config.network == 'resnet_gdrq':
         symbol = eval(config.network)(units=config.units,
                                       num_stage=config.num_stage,
                                       filter_list=config.filter_list,
@@ -96,9 +96,7 @@ def main(config):
                                       dataset_type=config.dataset,
                                       quant_mod=config.quant_mod,
                                       delay_quant=config.delay_quant,
-                                      is_weight_perchannel=config.is_weight_perchannel,
-                                      use_global_stats=config.use_global_stats,
-                                      fix_gamma=config.fix_gamma)
+                                      is_weight_perchannel=config.is_weight_perchannel)
     elif config.network == 'resnet_mxnet':
         symbol = eval(config.network)(units=config.units,
                                       num_stage=config.num_stage,
