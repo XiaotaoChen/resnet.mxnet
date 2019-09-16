@@ -117,14 +117,7 @@ def main(config):
                                       bottle_neck=config.bottle_neck)
     elif config.network == 'vgg16' or config.network == 'mobilenet' or config.network == 'shufflenet':
         symbol = eval(config.network)(num_classes=config.num_classes)
-    elif config.network == 'mobilenet_int8':
-        symbol = eval(config.network)(num_classes=config.num_classes,
-                                      quant_mod=config.quant_mod,
-                                      delay_quant=config.delay_quant,
-                                      is_weight_perchannel=config.is_weight_perchannel,
-                                      use_global_stats=config.use_global_stats,
-                                      fix_gamma=config.fix_gamma)
-    elif config.network == 'mobilenet_int8_clipgrad':
+    elif config.network in ["mobilenet_int8", "mobilenet_int8_clipgrad", "mobilenet_int8_gdrq"]:
         symbol = eval(config.network)(num_classes=config.num_classes,
                                       quant_mod=config.quant_mod,
                                       delay_quant=config.delay_quant,

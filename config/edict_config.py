@@ -7,11 +7,11 @@ config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
 #config.gpu_list = [0, 1, 2, 3]
 config.platform = "aliyun"
 config.dataset = "imagenet" # imagenet or cifar10
-config.network = "mobilenet_int8_clipgrad"
+config.network = "mobilenet_int8_gdrq"
 config.depth = 50 if config.dataset == 'imagenet' else 50
 config.model_load_epoch = 100
 # config.model_prefix = config.network + '_' + config.dataset
-config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_clipgrad_0915'
+config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_gdrq_0916'
 config.model_load_prefix = 'mobilenet/mobilenet'  # 'resnet50_new/resnet_imagenet'
 config.retrain = True
 config.use_global_stats=False
