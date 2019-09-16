@@ -174,7 +174,17 @@ def main(config):
         # if not, dist_sync can hang at the end with one machine waiting for other machines
         train = mx.io.ResizeIter(train, epoch_size)
 
-    if config.warmup is not None and config.warmup is True:
+    if config.quantize_lr_step is not None and config.quantize_lr is not None and \
+       config.quantize_finetune_epoch is not None:
+        lr_epoch_diff = config.quantize_lr_step
+        lr = config.lr * (config.lr_factor **(len(config.lr_step) - len(lr_epoch_diff)))
+        lr_scheduler = multi_factor_scheduler(0, epoch_size, step=config.quantize_lr_step,
+                                              factor=config.lr_factor)
+        step_ = [epoch * epoch_size for epoch in lr_epoch_diff]
+        logging.info('quantize finetuning multi_factor_scheduler lr:{}, epoch size:{}, epoch diff:{}, '
+                     'step:{}'.format(lr, epoch_size, lr_epoch_diff, step_))
+
+    elif config.warmup is not None and config.warmup is True:
         lr_epoch = [int(epoch) for epoch in config.lr_step]
         lr_epoch_diff = [epoch - config.begin_epoch for epoch in lr_epoch if epoch > config.begin_epoch]
         lr = config.lr * (config.lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))

@@ -15,9 +15,9 @@ elif config.dataset == "cifar10" :
 elif config.dataset == "cifar100":
     config.depth = 18
 config.model_load_epoch = 100
-# config.model_prefix = config.network + '_' + config.dataset
-config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_gdrq_0916'
-config.model_load_prefix = '0916_resnet_cifar100/resnet_cifar100'  # 'resnet50_new/resnet_imagenet'
+config.model_prefix = config.network + '_' + config.dataset
+# config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_gdrq_0916'
+config.model_load_prefix = '0916_resnet_cifar100_new/resnet_cifar100'  # 'resnet50_new/resnet_imagenet'
 config.retrain = True
 config.use_global_stats=False
 config.fix_gamma=False
@@ -26,6 +26,10 @@ config.quant_mod = 'minmax'
 config.delay_quant = 0
 config.allow_missing = True
 config.is_weight_perchannel = False
+config.quantize_finetune_epoch=50
+config.quantize_lr_step = [20, 40]
+config.quantize_lr = 0.1
+
 # for fold bn
 config.total_params_path = "./model/%s-%04d.params"%(config.model_load_prefix, config.model_load_epoch)
 config.quantize_flag = True
@@ -64,7 +68,8 @@ elif config.dataset == "cifar100":
     config.lr_step = [30, 60, 90]
     config.num_epoch = 100
 
-config.num_epoch = 130
+if config.quantize_finetune_epoch is not None:
+    config.num_epoch += config.quantize_finetune_epoch
 
 config.lr_factor = 0.1
 config.begin_epoch = config.model_load_epoch if config.retrain else 0
