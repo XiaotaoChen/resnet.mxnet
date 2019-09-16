@@ -6,16 +6,21 @@ config = edict()
 config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
 #config.gpu_list = [0, 1, 2, 3]
 config.platform = "aliyun"
-config.dataset = "imagenet" # imagenet or cifar10
-config.network = "mobilenet_int8_gdrq"
-config.depth = 50 if config.dataset == 'imagenet' else 50
+config.dataset = "cifar100" # imagenet or cifar10
+config.network = "resnet_gdrq"
+if config.dataset == "imagenet":
+    config.depth = 50
+elif config.dataset == "cifar10" :
+    config.depth = 50
+elif config.dataset == "cifar100":
+    config.depth = 18
 config.model_load_epoch = 100
 # config.model_prefix = config.network + '_' + config.dataset
 config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_gdrq_0916'
-config.model_load_prefix = 'mobilenet/mobilenet'  # 'resnet50_new/resnet_imagenet'
+config.model_load_prefix = '0916_resnet_cifar100/resnet_cifar100'  # 'resnet50_new/resnet_imagenet'
 config.retrain = True
 config.use_global_stats=False
-config.fix_gamma=True
+config.fix_gamma=False
 # for int8 training
 config.quant_mod = 'minmax'
 config.delay_quant = 0
@@ -27,12 +32,20 @@ config.quantize_flag = True
 
 # data
 if config.platform == 'truenas':
-    config.data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/imagenet/ILSVRC2012' if config.dataset == 'imagenet' \
-        else '/mnt/truenas/scratch/xiaotao.chen/dataset/cifar10'
+    if config.dataset == "imagenet":
+        config.data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/imagenet/ILSVRC2012'
+    elif config.dataset == "cifar10":
+        config.data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/cifar10'
+    elif config.dataset == "cifar100":
+        config.data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/cifar100'
 else:
-    config.data_dir = '/mnt/tscpfs/bigfile/data/ILSVRC2012' if config.dataset == 'imagenet' \
-        else '/mnt/tscpfs/xiaotao.chen/dataset/cifar10'
-config.batch_per_gpu = 64
+    if config.dataset == "imagenet":
+        config.data_dir = '/mnt/tscpfs/bigfile/data/ILSVRC2012'
+    elif config.dataset == "cifar10":
+        config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar10"
+    elif config.dataset == "cifar100":
+        config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar100"
+config.batch_per_gpu = 16
 config.batch_size = config.batch_per_gpu * len(config.gpu_list)
 config.kv_store = 'local'
 
@@ -44,9 +57,12 @@ config.multi_precision = True
 if config.dataset == "imagenet":
     config.lr_step = [30, 60, 90]
     config.num_epoch = 100
-else:
+elif config.dataset == "cifar10":
     config.lr_step = [120, 160, 240]
     config.num_epoch = 300
+elif config.dataset == "cifar100":
+    config.lr_step = [30, 60, 90]
+    config.num_epoch = 100
 
 config.num_epoch = 130
 
@@ -105,5 +121,21 @@ elif config.dataset == "cifar10":
     else:
         raise ValueError("no experiments done on detph {}, you can do it youself".format(args.depth))
     config.units = per_unit*3
+elif config.dataset == "cifar100":
+    config.num_classes = 100
+    config.image_shape = [3, 28, 28]
+    config.num_stage = 4
+    config.units_dict = {"18": [2, 2, 2, 2],
+                  "34": [3, 4, 6, 3],
+                  "50": [3, 4, 6, 3],
+                  "101": [3, 4, 23, 3],
+                  "152": [3, 8, 36, 3]}
+    config.units = config.units_dict[str(config.depth)]
+    if config.depth >= 50:
+        config.filter_list = [64, 256, 512, 1024, 2048]
+        config.bottle_neck = True
+    else:
+        config.filter_list = [64, 64, 128, 256, 512]
+        config.bottle_neck = False
 else:
     raise ValueError("do not support {} yet".format(config.dataset))

@@ -72,7 +72,7 @@ def resnet(units, num_stage, filter_list, num_classes, data_type, bottle_neck=Tr
         body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=eps, momentum=bn_mom, name='bn0')
         body = mx.sym.Activation(data=body, act_type='relu', name='relu0')
         body = mx.symbol.Pooling(data=body, kernel=(3, 3), stride=(2, 2), pad=(1, 1), pool_type='max')
-    elif dataset_type == 'cifar10':
+    elif dataset_type in ['cifar10', 'cifar100']:
         body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(3, 3), stride=(1, 1), pad=(1, 1),
                                   no_bias=True, name="conv0", workspace=workspace)
     else:

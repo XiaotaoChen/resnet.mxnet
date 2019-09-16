@@ -4,6 +4,8 @@ import config
 import mxnet as mx
 import numpy as np
 from .GDRQ_quantization_int8 import GDRQ_quant_conv, GDRQ_quant_fc
+# from .clip_grad_quantization_int8 import clipgrad_quant_conv as GDRQ_quant_conv
+# from .clip_grad_quantization_int8 import clipgrad_quant_fc as GDRQ_quant_fc
 
 eps = 1e-5
 
@@ -111,13 +113,14 @@ def resnet_gdrq(units, num_stage, filter_list, num_classes, data_type, bottle_ne
         body = mx.sym.BatchNorm(data=body, fix_gamma=False, eps=eps, momentum=bn_mom, name='bn0')
         body = mx.sym.Activation(data=body, act_type='relu', name='relu0')
         body = mx.symbol.Pooling(data=body, kernel=(3, 3), stride=(2, 2), pad=(1, 1), pool_type='max')
-    elif dataset_type == 'cifar10':
+    elif dataset_type in ['cifar10', 'cifar100']:
         # body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(3, 3), stride=(1, 1), pad=(1, 1),
         #                           no_bias=True, name="conv0", workspace=workspace)
         body = GDRQ_quant_conv(data=data, num_filter=filter_list[0], kernel=(3, 3), stride=(1, 1), pad=(1, 1),
                                   no_bias=True, name="conv0", 
                                    quant_mod=quant_mod, delay_quant=delay_quant, 
                                    is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes)
+                                
     else:
         raise ValueError("resnet only support imagenet or cifar10 dataset")
 

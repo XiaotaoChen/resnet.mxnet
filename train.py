@@ -66,6 +66,11 @@ def main(config):
                                                          batch_size=config.batch_size,
                                                          kv=kv,
                                                          image_shape=tuple(config.image_shape))
+        elif config.dataset == 'cifar100':
+            train, val, num_examples = cifar100_iterator(data_dir=config.data_dir,
+                                                         batch_size=config.batch_size,
+                                                         kv=kv,
+                                                         image_shape=tuple(config.image_shape))
     logging.info(train)
     logging.info(val)
 
