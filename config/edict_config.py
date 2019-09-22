@@ -6,8 +6,8 @@ config = edict()
 config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
 #config.gpu_list = [0, 1, 2, 3]
 config.platform = "aliyun"
-config.dataset = "cifar100" # imagenet or cifar10
-config.network = "resnet_gdrq"
+config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
+config.network = "mobilenet_int8_cxx"
 if config.dataset == "imagenet":
     config.depth = 50
 elif config.dataset == "cifar10" :
@@ -15,20 +15,26 @@ elif config.dataset == "cifar10" :
 elif config.dataset == "cifar100":
     config.depth = 18
 config.model_load_epoch = 100
-config.model_prefix = config.network + '_' + config.dataset
-# config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_gdrq_0916'
-config.model_load_prefix = '0916_resnet_cifar100_new/resnet_cifar100'  # 'resnet50_new/resnet_imagenet'
+# config.model_prefix = config.network + '_' + config.dataset
+config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_quant_cxx_clip_0922'
+config.model_load_prefix = 'mobilenet/mobilenet'  # 'resnet50_new/resnet_imagenet'
 config.retrain = True
 config.use_global_stats=False
-config.fix_gamma=False
+config.fix_gamma=True
 # for int8 training
-config.quant_mod = 'minmax'
+config.quant_mode = "minmax"
+config.grad_mode = "clip"
+config.dict_shapes = {"data" : (1, 3, 224, 224)}
 config.delay_quant = 0
 config.allow_missing = True
 config.is_weight_perchannel = False
-config.quantize_finetune_epoch=50
-config.quantize_lr_step = [20, 40]
-config.quantize_lr = 0.1
+config.quantize_finetune_epoch=20
+config.quantize_lr_step = None
+config.quantize_lr = None
+if "gdrq" in config.network:
+    config.quantize_finetune_epoch=50
+    config.quantize_lr_step = [20, 40]
+    config.quantize_lr = 0.1
 
 # for fold bn
 config.total_params_path = "./model/%s-%04d.params"%(config.model_load_prefix, config.model_load_epoch)
@@ -49,7 +55,7 @@ else:
         config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar10"
     elif config.dataset == "cifar100":
         config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar100"
-config.batch_per_gpu = 16
+config.batch_per_gpu = 64
 config.batch_size = config.batch_per_gpu * len(config.gpu_list)
 config.kv_store = 'local'
 
