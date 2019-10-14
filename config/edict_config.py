@@ -7,7 +7,7 @@ config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
 #config.gpu_list = [0, 1, 2, 3]
 config.platform = "aliyun"
 config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
-config.network = "resnet_int8"
+config.network = "resnet"
 if config.dataset == "imagenet":
     config.depth = 34
 elif config.dataset == "cifar10" :
@@ -15,30 +15,14 @@ elif config.dataset == "cifar10" :
 elif config.dataset == "cifar100":
     config.depth = 18
 config.model_load_epoch = 100
-# config.model_prefix = config.network + '_' + config.dataset
-config.model_prefix = "1013_" + config.network + str(config.depth) + '_' + config.dataset
-config.model_load_prefix = '1011_resnet34_imagenet_fp32/1011_resnet34_imagenet'  # 'resnet50_new/resnet_imagenet'
+config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
+config.model_load_prefix = 'model/1011_resnet34_imagenet_fp32/1011_resnet34_imagenet'  # 'resnet50_new/resnet_imagenet'
 config.retrain = True
+config.allow_missing = True
 config.use_global_stats=False
 config.fix_gamma=True
-# for int8 training
-config.quant_mode = "minmax"
-config.grad_mode = "ste"
-config.dict_shapes = {"data" : (1, 3, 224, 224)}
-config.delay_quant = 0
-config.allow_missing = True
-config.is_weight_perchannel = False
-config.quantize_finetune_epoch=50
-config.quantize_lr_step = None
-config.quantize_lr = None
-if "gdrq" in config.network:
-    config.quantize_finetune_epoch=50
-    config.quantize_lr_step = [20, 40]
-    config.quantize_lr = 0.1
 
-# # for fold bn
-# config.total_params_path = "./model/%s-%04d.params"%(config.model_load_prefix, config.model_load_epoch)
-# config.quantize_flag = True
+
 
 # data
 if config.platform == 'truenas':
@@ -55,7 +39,7 @@ else:
         config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar10"
     elif config.dataset == "cifar100":
         config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar100"
-config.batch_per_gpu = 64
+config.batch_per_gpu = 128
 config.batch_size = config.batch_per_gpu * len(config.gpu_list)
 config.kv_store = 'local'
 
@@ -66,16 +50,13 @@ config.momentum = 0.9
 config.multi_precision = True
 if config.dataset == "imagenet":
     config.lr_step = [30, 60, 90]
-    config.num_epoch = 100
+    config.num_epoch = 120
 elif config.dataset == "cifar10":
     config.lr_step = [120, 160, 240]
     config.num_epoch = 300
 elif config.dataset == "cifar100":
     config.lr_step = [30, 60, 90]
     config.num_epoch = 100
-
-if config.quantize_finetune_epoch is not None:
-    config.num_epoch += config.quantize_finetune_epoch
 
 config.lr_factor = 0.1
 config.begin_epoch = config.model_load_epoch if config.retrain else 0
@@ -150,3 +131,42 @@ elif config.dataset == "cifar100":
         config.bottle_neck = False
 else:
     raise ValueError("do not support {} yet".format(config.dataset))
+
+
+# for quantize int8 training
+config.quantize_flag = True
+'''
+delya_quant: after delay_quant iters, the quantization working actually.
+ema_decay:  the hyperparameter for activation threshold update.
+grad_mode:  the mode for gradients pass. there are two mode: ste or clip. 
+            ste mean straightforward pass the out gradients to data,
+            clip mean only pass the gradients whose value of data in the range of [-threshold, threshold],
+                        the gradients of outer is settting to 0.
+workspace:  the temporary space used in grad_mode=clip
+'''
+quantization_int8_base_quant_attrs = {
+    "delay_quant": "0", 
+    "ema_decay": "0.99",
+    "grad_mode": "ste",
+    "workspace": "1024"
+}
+QIL_base_quant_attrs = {
+    "fix_gamma": "True", 
+    "nbits": "8"
+}
+quantize_attrs = {"Quantization_int8" : quantization_int8_base_quant_attrs, "QIL": QIL_base_quant_attrs}
+
+config.quantize_op_name = "QIL"  # "Quantization_int8"  # "QIL"
+config.base_quant_attrs = quantize_attrs[config.quantize_op_name]
+
+# config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
+config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
+config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
+
+
+config.output_dir = "1014_" + config.model_prefix + "_" + config.quantize_op_name
+
+if config.quantize_flag:
+    config.lr *= 0.1
+    config.lr_step = [120, 140, 160, 180]
+    config.num_epoch = 190

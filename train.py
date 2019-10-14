@@ -14,14 +14,13 @@ import pprint
 from core.scheduler import WarmupMultiFactorScheduler
 
 def main(config):
-    # log file
-    log_dir = "./log"
-    if not os.path.exists(log_dir):
-        os.mkdir(log_dir)
+    output_dir = "experiments/" + config.output_dir
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s %(name)s %(levelname)s %(message)s',
                         datefmt='%m-%d %H:%M',
-                        filename='{}/{}.log'.format(log_dir, config.model_prefix),
+                        filename='{}/{}.log'.format(output_dir, config.model_prefix),
                         filemode='a')
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
@@ -30,12 +29,6 @@ def main(config):
     logging.getLogger('').addHandler(console)
 
     logging.info(config)
-
-
-    # model folder
-    model_dir = "./model"
-    if not os.path.exists(model_dir):
-        os.mkdir(model_dir)
 
     # set up environment
     devs = [mx.gpu(int(i)) for i in config.gpu_list]
@@ -89,19 +82,6 @@ def main(config):
                                       grad_scale=config.grad_scale,
                                       memonger=config.memonger,
                                       dataset_type=config.dataset)
-    elif config.network in ['resnet_gdrq', 'resnet_int8']:
-        symbol = eval(config.network)(units=config.units,
-                                      num_stage=config.num_stage,
-                                      filter_list=config.filter_list,
-                                      num_classes=config.num_classes,
-                                      data_type=config.data_type,
-                                      bottle_neck=config.bottle_neck,
-                                      grad_scale=config.grad_scale,
-                                      memonger=config.memonger,
-                                      dataset_type=config.dataset,
-                                      quant_mode=config.quant_mode,
-                                      delay_quant=config.delay_quant,
-                                      is_weight_perchannel=config.is_weight_perchannel)
     elif config.network == 'resnet_mxnet':
         symbol = eval(config.network)(units=config.units,
                                       num_stage=config.num_stage,
@@ -120,39 +100,18 @@ def main(config):
                                       bottle_neck=config.bottle_neck)
     elif config.network == 'vgg16' or config.network == 'mobilenet' or config.network == 'shufflenet':
         symbol = eval(config.network)(num_classes=config.num_classes)
-    elif config.network in ["mobilenet_int8", "mobilenet_int8_clipgrad", "mobilenet_int8_gdrq"]:
-        symbol = eval(config.network)(num_classes=config.num_classes,
-                                      quant_mode=config.quant_mode,
-                                      delay_quant=config.delay_quant,
-                                      is_weight_perchannel=config.is_weight_perchannel,
-                                      use_global_stats=config.use_global_stats,
-                                      fix_gamma=config.fix_gamma)
-    elif config.network == "mobilenet_int8_cxx":
-        dict_shapes = {}
-        for k,v in config.dict_shapes.items():
-            dict_shapes[k] = tuple(v)
-        symbol = eval(config.network)(num_classes=config.num_classes,
-                                      quant_mode=config.quant_mode,
-                                      delay_quant=config.delay_quant,
-                                      is_weight_perchannel=config.is_weight_perchannel,
-                                      use_global_stats=config.use_global_stats,
-                                      fix_gamma=config.fix_gamma,
-                                      grad_mode=config.grad_mode,
-                                      dict_shapes=dict_shapes)
-    elif config.network == 'mobilenet_int8_foldbn':
-        symbol = eval(config.network)(num_classes=config.num_classes,
-                                      quant_mode=config.quant_mode,
-                                      delay_quant=config.delay_quant,
-                                      is_weight_perchannel=config.is_weight_perchannel,
-                                      total_params_path=None,
-                                      quantize_flag=config.quantize_flag)
-    elif config.network == 'mobilenet_int8_foldbn_v1':
-        symbol = eval(config.network)(num_classes=config.num_classes,
-                                      quant_mode=config.quant_mode,
-                                      delay_quant=config.delay_quant,
-                                      is_weight_perchannel=config.is_weight_perchannel,
-                                      use_global_stats=config.use_global_stats,
-                                      quantize_flag=config.quantize_flag)
+
+    if config.quantize_flag:
+        assert config.data_type == "float32", "current quantization op only support fp32 mode."
+        from core.graph_optimize import attach_quantize_node
+        worker_data_shape = dict(data_shapes + label_shapes)
+        _, out_shape, _ = symbol.get_internals().infer_shape(**worker_data_shape)
+        out_shape_dictoinary = dict(zip(symbol.get_internals().list_outputs(), out_shape))
+        symbol = attach_quantize_node(symbol, out_shape_dictoinary, config.quantize_op_name, 
+                                      config.base_quant_attrs, config.quantized_op, config.skip_quantize_counts)
+        # symbol.save("attached_quant.json")
+        # raise NotImplementedError
+
     # symbol.save(config.network + ".json")
     # raise NotImplementedError
     # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
@@ -184,17 +143,7 @@ def main(config):
         # if not, dist_sync can hang at the end with one machine waiting for other machines
         train = mx.io.ResizeIter(train, epoch_size)
 
-    if config.quantize_lr_step is not None and config.quantize_lr is not None and \
-       config.quantize_finetune_epoch is not None:
-        lr_epoch_diff = config.quantize_lr_step
-        lr = config.quantize_lr * (config.lr_factor **(len(config.quantize_lr_step) - len(lr_epoch_diff)))
-        lr_scheduler = multi_factor_scheduler(0, epoch_size, step=config.quantize_lr_step,
-                                              factor=config.lr_factor)
-        step_ = [epoch * epoch_size for epoch in lr_epoch_diff]
-        logging.info('quantize finetuning multi_factor_scheduler lr:{}, epoch size:{}, epoch diff:{}, '
-                     'step:{}'.format(lr, epoch_size, lr_epoch_diff, step_))
-
-    elif config.warmup is not None and config.warmup is True:
+    if config.warmup is not None and config.warmup is True:
         lr_epoch = [int(epoch) for epoch in config.lr_step]
         lr_epoch_diff = [epoch - config.begin_epoch for epoch in lr_epoch if epoch > config.begin_epoch]
         lr = config.lr * (config.lr_factor ** (len(lr_epoch) - len(lr_epoch_diff)))
@@ -257,16 +206,15 @@ def main(config):
                     context=devs,
                     # for evaluate fold bn
                     config=config)
-    epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.model_prefix)
-    # epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.network)
+    epoch_end_callback = mx.callback.do_checkpoint(os.path.join(output_dir, config.model_prefix))
     batch_end_callback = mx.callback.Speedometer(config.batch_size, config.frequent)
     # batch_end_callback = DetailSpeedometer(config.batch_size, config.frequent)
     initializer = mx.init.Xavier(rnd_type='gaussian', factor_type='in', magnitude=2)
     arg_params = None
     aux_params = None
     if config.retrain:
-        print('******************** retrain load pretrain model from: model/{}'.format(config.model_load_prefix))
-        _, arg_params, aux_params = mx.model.load_checkpoint("model/{}".format(config.model_load_prefix),
+        print('******************** retrain load pretrain model from: {}'.format(config.model_load_prefix))
+        _, arg_params, aux_params = mx.model.load_checkpoint("{}".format(config.model_load_prefix),
                                                              config.model_load_epoch)
     solver.fit(train_data=train,
                eval_data=val,
