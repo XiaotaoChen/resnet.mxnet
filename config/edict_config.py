@@ -7,28 +7,28 @@ config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
 #config.gpu_list = [0, 1, 2, 3]
 config.platform = "aliyun"
 config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
-config.network = "mobilenet_int8_cxx"
+config.network = "resnet_int8"
 if config.dataset == "imagenet":
-    config.depth = 50
+    config.depth = 34
 elif config.dataset == "cifar10" :
     config.depth = 50
 elif config.dataset == "cifar100":
     config.depth = 18
 config.model_load_epoch = 100
 # config.model_prefix = config.network + '_' + config.dataset
-config.model_prefix = config.network + '_' + config.dataset + "_retrain_" + str(config.model_load_epoch) + '_quant_cxx_clip_0922'
-config.model_load_prefix = 'mobilenet/mobilenet'  # 'resnet50_new/resnet_imagenet'
+config.model_prefix = "1013_" + config.network + str(config.depth) + '_' + config.dataset
+config.model_load_prefix = '1011_resnet34_imagenet_fp32/1011_resnet34_imagenet'  # 'resnet50_new/resnet_imagenet'
 config.retrain = True
 config.use_global_stats=False
 config.fix_gamma=True
 # for int8 training
 config.quant_mode = "minmax"
-config.grad_mode = "clip"
+config.grad_mode = "ste"
 config.dict_shapes = {"data" : (1, 3, 224, 224)}
 config.delay_quant = 0
 config.allow_missing = True
 config.is_weight_perchannel = False
-config.quantize_finetune_epoch=20
+config.quantize_finetune_epoch=50
 config.quantize_lr_step = None
 config.quantize_lr = None
 if "gdrq" in config.network:
@@ -36,9 +36,9 @@ if "gdrq" in config.network:
     config.quantize_lr_step = [20, 40]
     config.quantize_lr = 0.1
 
-# for fold bn
-config.total_params_path = "./model/%s-%04d.params"%(config.model_load_prefix, config.model_load_epoch)
-config.quantize_flag = True
+# # for fold bn
+# config.total_params_path = "./model/%s-%04d.params"%(config.model_load_prefix, config.model_load_epoch)
+# config.quantize_flag = True
 
 # data
 if config.platform == 'truenas':

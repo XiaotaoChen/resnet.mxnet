@@ -89,7 +89,7 @@ def main(config):
                                       grad_scale=config.grad_scale,
                                       memonger=config.memonger,
                                       dataset_type=config.dataset)
-    elif config.network == 'resnet_gdrq':
+    elif config.network in ['resnet_gdrq', 'resnet_int8']:
         symbol = eval(config.network)(units=config.units,
                                       num_stage=config.num_stage,
                                       filter_list=config.filter_list,
@@ -99,7 +99,7 @@ def main(config):
                                       grad_scale=config.grad_scale,
                                       memonger=config.memonger,
                                       dataset_type=config.dataset,
-                                      quant_mod=config.quant_mod,
+                                      quant_mode=config.quant_mode,
                                       delay_quant=config.delay_quant,
                                       is_weight_perchannel=config.is_weight_perchannel)
     elif config.network == 'resnet_mxnet':
@@ -122,30 +122,40 @@ def main(config):
         symbol = eval(config.network)(num_classes=config.num_classes)
     elif config.network in ["mobilenet_int8", "mobilenet_int8_clipgrad", "mobilenet_int8_gdrq"]:
         symbol = eval(config.network)(num_classes=config.num_classes,
-                                      quant_mod=config.quant_mod,
+                                      quant_mode=config.quant_mode,
                                       delay_quant=config.delay_quant,
                                       is_weight_perchannel=config.is_weight_perchannel,
                                       use_global_stats=config.use_global_stats,
                                       fix_gamma=config.fix_gamma)
+    elif config.network == "mobilenet_int8_cxx":
+        dict_shapes = {}
+        for k,v in config.dict_shapes.items():
+            dict_shapes[k] = tuple(v)
+        symbol = eval(config.network)(num_classes=config.num_classes,
+                                      quant_mode=config.quant_mode,
+                                      delay_quant=config.delay_quant,
+                                      is_weight_perchannel=config.is_weight_perchannel,
+                                      use_global_stats=config.use_global_stats,
+                                      fix_gamma=config.fix_gamma,
+                                      grad_mode=config.grad_mode,
+                                      dict_shapes=dict_shapes)
     elif config.network == 'mobilenet_int8_foldbn':
         symbol = eval(config.network)(num_classes=config.num_classes,
-                                      quant_mod=config.quant_mod,
+                                      quant_mode=config.quant_mode,
                                       delay_quant=config.delay_quant,
                                       is_weight_perchannel=config.is_weight_perchannel,
                                       total_params_path=None,
                                       quantize_flag=config.quantize_flag)
     elif config.network == 'mobilenet_int8_foldbn_v1':
         symbol = eval(config.network)(num_classes=config.num_classes,
-                                      quant_mod=config.quant_mod,
+                                      quant_mode=config.quant_mode,
                                       delay_quant=config.delay_quant,
                                       is_weight_perchannel=config.is_weight_perchannel,
                                       use_global_stats=config.use_global_stats,
                                       quantize_flag=config.quantize_flag)
-
-    # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
     # symbol.save(config.network + ".json")
-    # import sys
-    # sys.exit()
+    # raise NotImplementedError
+    # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
 
     # memonger
     if config.memonger:
@@ -177,7 +187,7 @@ def main(config):
     if config.quantize_lr_step is not None and config.quantize_lr is not None and \
        config.quantize_finetune_epoch is not None:
         lr_epoch_diff = config.quantize_lr_step
-        lr = config.lr * (config.lr_factor **(len(config.lr_step) - len(lr_epoch_diff)))
+        lr = config.quantize_lr * (config.lr_factor **(len(config.quantize_lr_step) - len(lr_epoch_diff)))
         lr_scheduler = multi_factor_scheduler(0, epoch_size, step=config.quantize_lr_step,
                                               factor=config.lr_factor)
         step_ = [epoch * epoch_size for epoch in lr_epoch_diff]
@@ -295,10 +305,12 @@ def parse_args():
     parser.add_argument('--grad_scale', help='grad scale for fp16', default=config.grad_scale, type=float)
     parser.add_argument('--batch_per_gpu', help='batch size per gpu', default=config.batch_per_gpu, type=int)
     parser.add_argument('--benchmark', help='test network without data', default=config.benchmark, type=int)
-    parser.add_argument('--quant_mod', help='the quantize mode for weight, bias and activation',
-                        default=config.quant_mod, type=str)
+    parser.add_argument('--quant_mode', help='the quantize mode for weight, bias and activation',
+                        default=config.quant_mode, type=str)
     parser.add_argument('--delay_quant', help='after delay_quant iterations to execute quantization int8 op',
                         default=config.delay_quant, type=int)
+    parser.add_argument('--grad_mode', help='the mode for gradient of quantized node',
+                        default=config.grad_mode, type=str)
 
     # memory
     parser.add_argument('--memonger', help='use memonger to put more images on a single GPU', default=config.memonger, type=int)
@@ -328,7 +340,7 @@ def set_config(args):
     config.batch_size = config.batch_per_gpu * len(config.gpu_list)
     config.memonger = args.memonger
     config.benchmark = args.benchmark
-    config.quant_mod = args.quant_mod
+    config.quant_mode = args.quant_mode
     config.delay_quant = args.delay_quant
 
 

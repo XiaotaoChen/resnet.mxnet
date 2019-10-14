@@ -51,7 +51,7 @@ def Conv(data, num_filter=1, channel=1, kernel=(1, 1), stride=(1, 1), pad=(0, 0)
                 use_global_stats=use_global_stats,
                 # for debug
                 quantize_flag=quantize_flag,
-                data_shape=(1,3,224,224))
+                dict_shapes={"data":(1,3,224,224)})
 
     act = mx.sym.Activation(data=bn, act_type='relu', name='%s%s_relu' % (name, suffix))
     return act

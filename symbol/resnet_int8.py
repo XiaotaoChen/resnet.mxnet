@@ -2,14 +2,16 @@ import sys
 
 import mxnet as mx
 import numpy as np
-from .quant_ops import quant_conv
-from .quant_ops import quant_fc
+# from .quant_ops import quant_conv
+# from .quant_ops import quant_fc
+from .int8_api import quant_conv_cxx as quant_conv
+from .int8_api import quant_fc_cxx as quant_fc
 
 eps = 1e-5
 
 def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottle_neck=True,
                        bn_mom=0.9, workspace=512, memonger=False, 
-                       quant_mod='minmax', delay_quant=0, is_weight_perchannel=False,
+                       quant_mode='minmax', delay_quant=0, is_weight_perchannel=False, dict_shapes={'data':(1, 3, 224, 224)},
                        use_global_stats=False, fix_gamma=False):
     if bottle_neck:
         bn1 = mx.sym.BatchNorm(data=data, eps=eps, momentum=bn_mom, name=name + '_bn1',
@@ -17,25 +19,25 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
         act1 = mx.sym.Activation(data=bn1, act_type='relu', name=name + '_relu1')
         conv1 = quant_conv(name=name + '_conv1', data=act1, num_filter=int(num_filter * 0.25), kernel=(1, 1), stride=(1, 1),
                            pad=(0, 0), no_bias=True, 
-                           quant_mod=quant_mod, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel)
+                           quant_mode=quant_mode, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes)
         bn2 = mx.sym.BatchNorm(data=conv1, eps=eps, momentum=bn_mom, name=name + '_bn2',
                                 fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         act2 = mx.sym.Activation(data=bn2, act_type='relu', name=name + '_relu2')
         conv2 = quant_conv(name=name + '_conv2', data=act2, num_filter=int(num_filter * 0.25), kernel=(3, 3), stride=stride,
                            pad=(1, 1), no_bias=True, 
-                           quant_mod=quant_mod, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel)
+                           quant_mode=quant_mode, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes)
         bn3 = mx.sym.BatchNorm(data=conv2, eps=eps, momentum=bn_mom, name=name + '_bn3',
                                 fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         act3 = mx.sym.Activation(data=bn3, act_type='relu', name=name + '_relu3')
         conv3 = quant_conv(name=name + '_conv3', data=act3, num_filter=num_filter, kernel=(1, 1), 
                            stride=(1, 1), pad=(0, 0), no_bias=True,
-                           quant_mod=quant_mod, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel)
+                           quant_mode=quant_mode, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes)
         if dim_match:
             shortcut = data
         else:
             shortcut = quant_conv(name=name + '_sc', data=act1, num_filter=num_filter, kernel=(1, 1), 
                                   stride=stride, no_bias=True,
-                                  quant_mod=quant_mod, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel)
+                                  quant_mode=quant_mode, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes)
         if memonger:
             shortcut._set_attr(mirror_stage='True')
 
@@ -44,21 +46,21 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
         bn1 = mx.sym.BatchNorm(data=data, momentum=bn_mom, eps=eps, name=name + '_bn1',
                                 fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         act1 = mx.sym.Activation(data=bn1, act_type='relu', name=name + '_relu1')
-        conv1 = quant_conv(name=name + '_conv1', data=relu1_q, num_filter=num_filter, kernel=(3, 3), 
+        conv1 = quant_conv(name=name + '_conv1', data=act1, num_filter=num_filter, kernel=(3, 3), 
                            stride=stride, pad=(1, 1), no_bias=True,
-                           quant_mod=quant_mod, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel)
+                           quant_mode=quant_mode, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes)
         bn2 = mx.sym.BatchNorm(data=conv1, momentum=bn_mom, eps=eps, name=name + '_bn2',
                                 fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         act2 = mx.sym.Activation(data=bn2, act_type='relu', name=name + '_relu2')
-        conv2 = quant_conv(name=name + '_conv2', data=relu2_q, num_filter=num_filter, kernel=(3, 3), 
+        conv2 = quant_conv(name=name + '_conv2', data=act2, num_filter=num_filter, kernel=(3, 3), 
                            stride=(1, 1), pad=(1, 1), no_bias=True,
-                           quant_mod=quant_mod, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel)
+                           quant_mode=quant_mode, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes)
         if dim_match:
             shortcut = data
         else:
-            shortcut = quant_conv(name=name + '_sc', data=data_sc_q, num_filter=num_filter, kernel=(1, 1), 
+            shortcut = quant_conv(name=name + '_sc', data=act1, num_filter=num_filter, kernel=(1, 1), 
                                   stride=stride, no_bias=True,
-                                  quant_mod=quant_mod, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel)
+                                  quant_mode=quant_mode, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes)
         if memonger:
             shortcut._set_attr(mirror_stage='True')
 
@@ -66,14 +68,14 @@ def residual_unit_int8(data, channel, num_filter, stride, dim_match, name, bottl
 
 def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_neck=True,
                 bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0, dataset_type=None,
-                quant_mod='minmax', delay_quant=0, is_weight_perchannel=False,
+                quant_mode='minmax', delay_quant=0, is_weight_perchannel=False, dict_shapes={'data':(1, 3, 224, 224)},
                 use_global_stats=False, fix_gamma=False):
     num_unit = len(units)
     assert (num_unit == num_stage)
     print('units:{}, num_stage:{}, filter_list:{}, num_classes:{}, data_type:{}, bottle_neck:{},'
-          'bn_mom:{}, quant_mod:{}, delay_quant:{}, is_weight_perchannel:{}'.format(
+          'bn_mom:{}, quant_mode:{}, delay_quant:{}, is_weight_perchannel:{}'.format(
         units, num_stage, filter_list, num_classes, data_type, bottle_neck,
-        bn_mom, quant_mod, delay_quant, is_weight_perchannel
+        bn_mom, quant_mode, delay_quant, is_weight_perchannel
     ))
     data = mx.sym.Variable(name='data')
     if data_type == 'float32':
@@ -86,7 +88,7 @@ def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_ne
     if dataset_type == 'imagenet':
         body = quant_conv(name="conv0", data=data, num_filter=filter_list[0], kernel=(7, 7), 
                           stride=(2, 2), pad=(3, 3), no_bias=True, 
-                          quant_mod=quant_mod, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel)
+                          quant_mode=quant_mode, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes)
         body = mx.sym.BatchNorm(data=body, eps=eps, momentum=bn_mom, name='bn0',
                                 fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         body = mx.sym.Activation(data=body, act_type='relu', name='relu0')
@@ -94,7 +96,7 @@ def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_ne
     elif dataset_type == 'cifar10':
         body = quant_conv(name="conv0", data=data, num_filter=filter_list[0], kernel=(3, 3), 
                           stride=(1, 1), pad=(1, 1), no_bias=True,
-                          quant_mod=quant_mod, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel)
+                          quant_mode=quant_mode, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes)
     else:
         raise ValueError("resnet only support imagenet or cifar10 dataset, {}".format(dataset_type))
 
@@ -102,14 +104,14 @@ def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_ne
         body = residual_unit_int8(body, filter_list[i], filter_list[i + 1], (1 if i == 0 else 2, 1 if i == 0 else 2), False,
                              name='stage%d_unit%d' % (i + 1, 1), bottle_neck=bottle_neck, workspace=workspace,
                              memonger=memonger, 
-                             quant_mod=quant_mod, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel,
+                             quant_mode=quant_mode, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes,
                              fix_gamma=fix_gamma, use_global_stats=use_global_stats)
         for j in range(int(units[i] - 1)):
             body = residual_unit_int8(body, filter_list[i + 1], filter_list[i + 1], (1, 1), True, 
                                       name='stage%d_unit%d' % (i + 1, j + 2),
                                       bottle_neck=bottle_neck, workspace=workspace, memonger=memonger,
-                                      quant_mod=quant_mod, delay_quant=delay_quant, 
-                                      is_weight_perchannel=is_weight_perchannel,
+                                      quant_mode=quant_mode, delay_quant=delay_quant, 
+                                      is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes,
                                       fix_gamma=fix_gamma, use_global_stats=use_global_stats)
     bn1 = mx.sym.BatchNorm(data=body, eps=eps, momentum=bn_mom, name='bn1',
                                 fix_gamma=fix_gamma, use_global_stats=use_global_stats)
@@ -120,7 +122,7 @@ def resnet_int8(units, num_stage, filter_list, num_classes, data_type, bottle_ne
 
     # # add quantize for fc
     fc1 = quant_fc(name='fc1', data=flat, num_hidden=num_classes,
-                   quant_mod=quant_mod, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel)
+                   quant_mode=quant_mode, delay_quant=delay_quant, is_weight_perchannel=is_weight_perchannel, dict_shapes=dict_shapes)
     if data_type == 'float16':
         fc1 = mx.sym.Cast(data=fc1, dtype=np.float32)
         cls = mx.symbol.SoftmaxOutput(data=fc1, name='softmax', grad_scale=grad_scale)
