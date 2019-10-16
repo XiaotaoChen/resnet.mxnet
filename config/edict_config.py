@@ -16,11 +16,11 @@ elif config.dataset == "cifar100":
     config.depth = 18
 config.model_load_epoch = 100
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
-config.model_load_prefix = 'model/1011_resnet18_imagenet_fp32/1011_resnet18_imagenet'  # 'resnet50_new/resnet_imagenet'
+config.model_load_prefix = 'model/1011_resnet18_imagenet_fp32/1011_resnet18_imagenet'
 config.retrain = True
 config.allow_missing = True
-config.use_global_stats=False
-config.fix_gamma=True
+# config.use_global_stats=False
+# config.fix_gamma=True
 
 
 
@@ -148,7 +148,6 @@ quantization_int8_base_quant_attrs = {
     "delay_quant": "0", 
     "ema_decay": "0.99",
     "grad_mode": "clip",
-    "workspace": "1024"
 }
 QIL_base_quant_attrs = {
     "fix_gamma": "True", 
@@ -162,11 +161,11 @@ config.base_quant_attrs = quantize_attrs[config.quantize_op_name]
 # config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
 config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
-config.fix_bn = True
+config.fix_bn = False
 
-config.output_dir = "1015_clip_" + config.model_prefix + "_" + config.quantize_op_name
+config.output_dir = "1016_clip_" + config.model_prefix + "_" + config.quantize_op_name
 
 if config.quantize_flag:
     config.lr *= 0.1
-    config.lr_step = [120, 140, 160, 180]
+    config.lr_step = [120, 150, 180]
     config.num_epoch = 190
