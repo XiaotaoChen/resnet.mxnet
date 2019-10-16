@@ -101,6 +101,11 @@ def main(config):
     elif config.network == 'vgg16' or config.network == 'mobilenet' or config.network == 'shufflenet':
         symbol = eval(config.network)(num_classes=config.num_classes)
 
+    if config.fix_bn:
+        from core.graph_optimize import fix_bn
+        print("********************* fix bn ***********************")
+        symbol = fix_bn(symbol)
+
     if config.quantize_flag:
         assert config.data_type == "float32", "current quantization op only support fp32 mode."
         from core.graph_optimize import attach_quantize_node

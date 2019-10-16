@@ -9,14 +9,14 @@ config.platform = "aliyun"
 config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
 config.network = "resnet"
 if config.dataset == "imagenet":
-    config.depth = 34
+    config.depth = 18
 elif config.dataset == "cifar10" :
     config.depth = 50
 elif config.dataset == "cifar100":
     config.depth = 18
 config.model_load_epoch = 100
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
-config.model_load_prefix = 'model/1011_resnet34_imagenet_fp32/1011_resnet34_imagenet'  # 'resnet50_new/resnet_imagenet'
+config.model_load_prefix = 'model/1011_resnet18_imagenet_fp32/1011_resnet18_imagenet'  # 'resnet50_new/resnet_imagenet'
 config.retrain = True
 config.allow_missing = True
 config.use_global_stats=False
@@ -147,7 +147,7 @@ workspace:  the temporary space used in grad_mode=clip
 quantization_int8_base_quant_attrs = {
     "delay_quant": "0", 
     "ema_decay": "0.99",
-    "grad_mode": "ste",
+    "grad_mode": "clip",
     "workspace": "1024"
 }
 QIL_base_quant_attrs = {
@@ -156,15 +156,15 @@ QIL_base_quant_attrs = {
 }
 quantize_attrs = {"Quantization_int8" : quantization_int8_base_quant_attrs, "QIL": QIL_base_quant_attrs}
 
-config.quantize_op_name = "QIL"  # "Quantization_int8"  # "QIL"
+config.quantize_op_name = "Quantization_int8"  # "QIL"
 config.base_quant_attrs = quantize_attrs[config.quantize_op_name]
 
 # config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
 config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
+config.fix_bn = True
 
-
-config.output_dir = "1014_" + config.model_prefix + "_" + config.quantize_op_name
+config.output_dir = "1015_clip_" + config.model_prefix + "_" + config.quantize_op_name
 
 if config.quantize_flag:
     config.lr *= 0.1
