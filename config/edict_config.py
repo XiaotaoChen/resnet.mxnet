@@ -4,19 +4,20 @@ config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
-#config.gpu_list = [0, 1, 2, 3]
+# config.gpu_list = [4]
 config.platform = "aliyun"
 config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
-config.network = "resnet"
-if config.dataset == "imagenet":
-    config.depth = 18
-elif config.dataset == "cifar10" :
-    config.depth = 50
-elif config.dataset == "cifar100":
-    config.depth = 18
-config.model_load_epoch = 100
+config.network = "resnet"  # "cifar10_sym"  # "resnet"
+config.depth = 18
+# if config.dataset == "imagenet":
+#     config.depth = 18
+# elif config.dataset == "cifar10" :
+#     config.depth = 50
+# elif config.dataset == "cifar100":
+#     config.depth = 18
+config.model_load_epoch =100
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
-config.model_load_prefix = 'model/1011_resnet18_imagenet_fp32/1011_resnet18_imagenet'
+config.model_load_prefix =  "model/1011_resnet18_imagenet_fp32/1011_resnet18_imagenet"   # "experiments/1017_cifar10_sym50_cifar10_QIL/cifar10_sym50_cifar10" # 'experiments/1017_resnet50_cifar10/resnet50_cifar10'
 config.retrain = True
 config.allow_missing = True
 # config.use_global_stats=False
@@ -151,21 +152,21 @@ quantization_int8_base_quant_attrs = {
 }
 QIL_base_quant_attrs = {
     "fix_gamma": "True", 
-    "nbits": "8"
+    "nbits": "4"
 }
 quantize_attrs = {"Quantization_int8" : quantization_int8_base_quant_attrs, "QIL": QIL_base_quant_attrs}
 
-config.quantize_op_name = "Quantization_int8"  # "QIL"
+config.quantize_op_name = "QIL"  # "Quantization_int8"  # "QIL"
 config.base_quant_attrs = quantize_attrs[config.quantize_op_name]
 
 # config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
 config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
 config.fix_bn = False
-
-config.output_dir = "1016_clip_" + config.model_prefix + "_" + config.quantize_op_name
+# config.output_dir = "1017_" + config.model_prefix
+config.output_dir = "1017_" + config.model_prefix + "_" + config.quantize_op_name
 
 if config.quantize_flag:
     config.lr *= 0.1
-    config.lr_step = [120, 150, 180]
+    config.lr_step = [120, 140, 160]
     config.num_epoch = 190

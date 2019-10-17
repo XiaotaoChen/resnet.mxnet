@@ -100,6 +100,9 @@ def main(config):
                                       bottle_neck=config.bottle_neck)
     elif config.network == 'vgg16' or config.network == 'mobilenet' or config.network == 'shufflenet':
         symbol = eval(config.network)(num_classes=config.num_classes)
+    elif config.network == "cifar10_sym":
+        symbol = eval(config.network)()
+
 
     if config.fix_bn:
         from core.graph_optimize import fix_bn

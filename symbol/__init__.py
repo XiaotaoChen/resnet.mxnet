@@ -11,3 +11,4 @@ from .mobilenet import mobilenet
 # from .mobilenet_int8_clipgrad import mobilenet_int8_clipgrad
 # from .mobilenet_int8_gdrq import mobilenet_int8_gdrq
 from .mobilenet_int8_cxx import mobilenet_int8_cxx
+from .simple import cifar10_sym

@@ -19,6 +19,15 @@ import json
 import logging
 import mxnet as mx
 
+from .operator.QIL import *
+
+FLOAT32_DTYPE = 0
+INIT_ZERO = '[\"zero\", {}]'
+INIT_ONE = '[\"one\", {}]'
+MINMAX_SUFFIX = "_minmax"
+QIL_PRUNING = "_pruning_point"
+QIL_CLIPPING = "_clipping_point"
+QIL_GAMMA = "_gamma"
 
 def merge_bn(symbol, args, auxs, symbol_only=False):
     """
@@ -142,6 +151,18 @@ def fix_bn(symbol):
     outputs = outputs[0] if len(outputs) == 1 else mx.sym.Group(outputs)
     return outputs
 
+def create_quant_node(quantize_op_name, var, attrs):
+    if quantize_op_name == "Quantization_int8":
+        minmax_var = mx.sym.var(name = var.name + MINMAX_SUFFIX, init=INIT_ZERO)
+        quanted_node = mx.sym.contrib.Quantization_int8(data=var, minmax=minmax_var, **attrs, name=var.name)
+    elif quantize_op_name == "QIL":
+        pruning_var = mx.sym.var(name = var.name + QIL_PRUNING, init=INIT_ZERO, lr_mult=0.01, wd_mult=0)
+        clipping_var = mx.sym.var(name = var.name + QIL_CLIPPING, init=INIT_ONE, lr_mult=0.01, wd_mult=0)
+        gamma_var = mx.sym.var(name = var.name + QIL_GAMMA, init=INIT_ONE)
+        quanted_node = mx.sym.Custom(data=var, pruning_point=pruning_var,
+                                     clipping_point=clipping_var,
+                                     gamma=gamma_var, **attrs, name=var.name, op_type='QIL_PY')
+    return quanted_node
 
 def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_attrs, 
                          quantized_op=["Convolution", "FullyConnected", "Deconvolution"], skip_quantize_counts=None):
@@ -153,7 +174,6 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_at
     assert symbol is not None
     assert base_quant_attrs is not None
     assert quantize_op_name in ["Quantization_int8", "QIL"]
-    quant_operator = eval("mx.sym.contrib." + quantize_op_name)
     if quantize_op_name ==  "Quantization_int8":
         # currently Quantization_int8 only support quant_mode = "minmax" and weight per tensor quantization method
         base_quant_attrs["is_weight_perchannel"] = "False"
@@ -185,7 +205,7 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_at
             assert node_name in out_shape_dict.keys(), "{} Variable is not in shape_dict".format(node_name)
             if "__shape__" not in attrs.keys():
                 attrs["__shape__"] = out_shape_dict[node_name]
-                attrs["__dtype__"] = 0  # "float32"
+                attrs["__dtype__"] = FLOAT32_DTYPE
             node_map[nid] = mx.sym.var(node_name, **attrs)
             node_op_map[nid] = ["Variable"]
         elif op_name in quantized_op:
@@ -206,13 +226,13 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_at
                     print("{} has attached quantized node".format(data_name))
                     data_quanted = quantized_node_map[data_name]
                 else:
-                    data_quanted = quant_operator(datavar, **data_quant_attrs, name=data_name)
+                    data_quanted = create_quant_node(quantize_op_name, datavar, data_quant_attrs)
                     quantized_node_map[data_name] = data_quanted
                 if weight_name in quantized_node_map.keys():
                     print("{} has attached quantized node".format(weight_name))
                     weight_quanted = quantized_node_map[weight_name]
                 else:
-                    weight_quanted = quant_operator(weightvar, **weight_quant_attrs, name=weight_name)
+                    weight_quanted = create_quant_node(quantize_op_name, weightvar, weight_quant_attrs)
                     quantized_node_map[weight_name] = weight_quanted
                 print("attach quantize node for {} inputs:{}, {}".format(op_name, data_name, weight_name))
                 quanted_children = [data_quanted, weight_quanted, biasvar]
@@ -225,7 +245,7 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_at
                         print("{} has attached quantized node".format(var.name))
                         quanted_children[i] = quantized_node_map[var.name]
                     else:
-                        quanted_var = quant_operator(var, **data_quant_attrs, name=var.name)
+                        quanted_var = create_quant_node(quantize_op_name, var, data_quant_attrs)
                         quantized_node_map[var.name] = quanted_var
                         quanted_children[i] = quantized_node_map[var.name]
             
@@ -252,13 +272,4 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_at
 
 if __name__ == "__main__":
     sym = mx.sym.load("source.json")
-    # sym1, _, _ = merge_bn(sym, None, None, True)
-    quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
-    base_quant_attrs = {
-            "delay_quant": "0", 
-            "ema_decay": "0.99", 
-            "grad_mode": "ste", 
-            "workspace": "1024"
-        }
-    sym1 = attach_quantize_node(sym, None, base_quant_attrs, quantized_op=quantized_op)
-    sym1.save("attached_quant.json")
+    sym1, _, _ = merge_bn(sym, None, None, True)
