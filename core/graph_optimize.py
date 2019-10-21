@@ -20,13 +20,18 @@ import logging
 import mxnet as mx
 
 from .operator.QIL import *
+from .operator.QIL_V2 import *
 
 FLOAT32_DTYPE = 0
 INIT_ZERO = '[\"zero\", {}]'
 INIT_ONE = '[\"one\", {}]'
+INIT_HALF = '[\"constant\", {\"value\": 0.5}]'
+INIT_0_4 = '[\"constant\", {\"value\": 0.4}]'
 MINMAX_SUFFIX = "_minmax"
 QIL_PRUNING = "_pruning_point"
 QIL_CLIPPING = "_clipping_point"
+QIL_CENTER = "_center"
+QIL_DISTANCE = "_distance"
 QIL_GAMMA = "_gamma"
 
 def merge_bn(symbol, args, auxs, symbol_only=False):
@@ -162,6 +167,13 @@ def create_quant_node(quantize_op_name, var, attrs):
         quanted_node = mx.sym.Custom(data=var, pruning_point=pruning_var,
                                      clipping_point=clipping_var,
                                      gamma=gamma_var, **attrs, name=var.name, op_type='QIL_PY')
+    elif quantize_op_name == "QIL_V2":
+        center_var = mx.sym.var(name = var.name + QIL_CENTER, init=INIT_HALF, lr_mult=0.01, wd_mult=0)
+        distance_var = mx.sym.var(name = var.name + QIL_DISTANCE, init=INIT_0_4, lr_mult=0.01, wd_mult=0)
+        gamma_var = mx.sym.var(name = var.name + QIL_GAMMA, init=INIT_ONE)
+        quanted_node = mx.sym.Custom(data=var, center=center_var,
+                                     distance=distance_var, gamma=gamma_var, 
+                                     **attrs, name=var.name, op_type='QIL_V2_PY')
     return quanted_node
 
 def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_attrs, 
@@ -173,7 +185,7 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_at
     """
     assert symbol is not None
     assert base_quant_attrs is not None
-    assert quantize_op_name in ["Quantization_int8", "QIL"]
+    assert quantize_op_name in ["Quantization_int8", "QIL", "QIL_V2"]
     if quantize_op_name ==  "Quantization_int8":
         # currently Quantization_int8 only support quant_mode = "minmax" and weight per tensor quantization method
         base_quant_attrs["is_weight_perchannel"] = "False"

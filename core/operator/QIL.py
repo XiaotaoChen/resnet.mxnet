@@ -59,15 +59,17 @@ class QIL_PY(mx.operator.CustomOp):
         pruning = pruning_point.asnumpy()
         clipping = clipping_point.asnumpy()
         if pruning[0] < 0:
+            # print("bad pruning < 0, {}".format(pruning[0]) )
             in_data[1][:] = mx.nd.zeros_like(in_data[1])[:]
             pruning_point = in_data[1]
         # else:
-        #     print("pruning >= 0. {}".format(pruning))
+        #     print("great pruning >= 0. {}".format(pruning[0]))
         if clipping[0] > 1:
+            # print("bad clipping > 1, {}".format(clipping[0]))
             in_data[2][:] = mx.nd.ones_like(in_data[2])[:]
             clipping_point = in_data[2]
         # else:
-        #     print("clipping <= 1.{}".format(clipping))
+        #     print("great clipping <= 1.{}".format(clipping[0]))
 
         center = 0.5 * (clipping_point + pruning_point)
         distance = 0.5 * (clipping_point - pruning_point)
@@ -100,23 +102,13 @@ class QIL_PY(mx.operator.CustomOp):
         clipping_point = in_data[2]
         gamma = in_data[3]
 
-        # if np.isnan(out_grad[0].asnumpy()).all():
-        #     print("call number:{}".format(self.count))
-        #     print("prunint_point:{}, clipping_point:{}".format(pruning_point.asnumpy()[0], clipping_point.asnumpy()[0]))
-        #     print("data shape:{},max(data):{}, max(abs(data)):{},  data[0,0]:\n{}".format(
-        #            data.shape, mx.nd.max(data), mx.nd.max(mx.nd.abs(data)), data[0,0]))
-        #     print("out data shape:{}, max(out_data):{} out data[0,0]:\n{}".format(
-        #            out_data[0].shape, mx.nd.max(out_data[0]), out_data[0][0,0]))
-        #     print("out_grad: shape:{}\nout_grad[0,0]:\n{}".format(out_grad[0].shape, out_grad[0][0,0]))
-        #     raise NotImplementedError
-
         data = data / self.max
         data_abs = mx.nd.abs(data)
         data_sign = mx.nd.sign(data)
         interval_flag = (data_abs > pruning_point) * (data_abs < clipping_point)
         
         interval_grad = interval_flag * out_grad[0]
-        data = interval_flag * out_grad[0]
+        # data = interval_flag * data # there is no need to get interval data
 
         pruning_grad = mx.nd.sum(interval_grad * ( (data - clipping_point* data_sign) /
                                                   ((clipping_point - pruning_point)**2) ) )
@@ -124,6 +116,10 @@ class QIL_PY(mx.operator.CustomOp):
                                                     ((clipping_point - pruning_point)**2) ) )
 
         self.assign(in_grad[0], req[0], interval_grad / (clipping_point - pruning_point) / self.max)
+        # print("pruning grad:{}, clipping_grad:{}, pruning:{}, clipping:{}, sum(interval_grad):{}".format(
+        #       pruning_grad.asnumpy()[0], clipping_grad.asnumpy()[0], 
+        #       pruning_point.asnumpy()[0], clipping_point.asnumpy()[0],
+        #       mx.nd.sum(interval_grad).asnumpy()[0]))
         self.assign(in_grad[1], req[1], pruning_grad)
         self.assign(in_grad[2], req[2], clipping_grad)
         
