@@ -72,7 +72,7 @@ def main(config):
     data_shapes = [('data', tuple([config.batch_size] + config.image_shape))]
     label_shapes = [('softmax_label', (config.batch_size,))]
 
-    if config.network == 'resnet':
+    if config.network in ['resnet', 'resnet_cifar10']:
         symbol = eval(config.network)(units=config.units,
                                       num_stage=config.num_stage,
                                       filter_list=config.filter_list,
@@ -117,7 +117,7 @@ def main(config):
         out_shape_dictoinary = dict(zip(symbol.get_internals().list_outputs(), out_shape))
         symbol = attach_quantize_node(symbol, out_shape_dictoinary, config.quantize_op_name, 
                                       config.base_quant_attrs, config.quantized_op, config.skip_quantize_counts)
-        # symbol.save("attached_quant.json")
+        # symbol.save("attach_quant.json")
         # raise NotImplementedError
 
     # symbol.save(config.network + ".json")

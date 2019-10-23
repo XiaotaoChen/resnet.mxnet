@@ -21,6 +21,7 @@ import mxnet as mx
 
 from .operator.QIL import *
 from .operator.QIL_V2 import *
+from .operator.PACT import * # PACT_PY, DoReFa_PY
 
 FLOAT32_DTYPE = 0
 INIT_ZERO = '[\"zero\", {}]'
@@ -33,6 +34,11 @@ QIL_CLIPPING = "_clipping_point"
 QIL_CENTER = "_center"
 QIL_DISTANCE = "_distance"
 QIL_GAMMA = "_gamma"
+
+def get_constant(value):
+    init_str = '[\"constant\", {\"value\": ' + str(value) + '}]'
+    return init_str
+
 
 def merge_bn(symbol, args, auxs, symbol_only=False):
     """
@@ -174,6 +180,16 @@ def create_quant_node(quantize_op_name, var, attrs):
         quanted_node = mx.sym.Custom(data=var, center=center_var,
                                      distance=distance_var, gamma=gamma_var, 
                                      **attrs, name=var.name, op_type='QIL_V2_PY')
+    elif quantize_op_name == "PACT":
+        if "weight" in var.name:
+            # DoReFa quantize
+            # return var
+            quanted_node = mx.sym.Custom(data=var, **attrs, name=var.name, op_type="DoReFa_PY")
+        else:
+            # PACT_ACT
+            # return var
+            gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(8.0), wd_mult=float(attrs["lamda"]))
+            quanted_node = mx.sym.Custom(data=var, gamma=gamma_var, **attrs, name=var.name, op_type="PACT_PY")
     return quanted_node
 
 def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_attrs, 
@@ -185,16 +201,22 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_at
     """
     assert symbol is not None
     assert base_quant_attrs is not None
-    assert quantize_op_name in ["Quantization_int8", "QIL", "QIL_V2"]
-    if quantize_op_name ==  "Quantization_int8":
-        # currently Quantization_int8 only support quant_mode = "minmax" and weight per tensor quantization method
-        base_quant_attrs["is_weight_perchannel"] = "False"
-        base_quant_attrs["quant_mode"] = "minmax"
-    base_quant_attrs["is_weight"] = "False"
+    assert quantize_op_name in ["Quantization_int8", "QIL", "QIL_V2", "PACT"]
+    if quantize_op_name in ["Quantization_int8", "QIL", "QIL_V2"]:
+        if quantize_op_name ==  "Quantization_int8":
+            # currently Quantization_int8 only support quant_mode = "minmax" and weight per tensor quantization method
+            base_quant_attrs["is_weight_perchannel"] = "False"
+            base_quant_attrs["quant_mode"] = "minmax"
+        base_quant_attrs["is_weight"] = "False"
 
-    data_quant_attrs = base_quant_attrs.copy()
-    weight_quant_attrs = base_quant_attrs.copy()
-    weight_quant_attrs["is_weight"] = "True"
+        data_quant_attrs = base_quant_attrs.copy()
+        weight_quant_attrs = base_quant_attrs.copy()
+        weight_quant_attrs["is_weight"] = "True"
+    elif quantize_op_name == "PACT":
+        data_quant_attrs = base_quant_attrs.copy()
+        weight_quant_attrs = base_quant_attrs.copy()
+        # weight_quant_attrs["nbits"] = str(int(weight_quant_attrs["nbits"]) - 1)
+        del weight_quant_attrs["lamda"]
 
     jgraph = json.loads(symbol.tojson())
     jnodes = jgraph["nodes"]
