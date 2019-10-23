@@ -192,31 +192,17 @@ def create_quant_node(quantize_op_name, var, attrs):
             quanted_node = mx.sym.Custom(data=var, gamma=gamma_var, **attrs, name=var.name, op_type="PACT_PY")
     return quanted_node
 
-def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_attrs, 
-                         quantized_op=["Convolution", "FullyConnected", "Deconvolution"], skip_quantize_counts=None):
+def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, weight_quant_attrs, act_quant_attrs, 
+                         quantized_op=("Convolution", "FullyConnected", "Deconvolution"), skip_quantize_counts=None):
     """
     Adapted from https://github.com/dmlc/tvm/blob/master/python/tvm/relay/frontend/mxnet.py
     Instead of translating nnvm graph into TVM relay graph, we adapt the script to translate
     it back to mxnet graph.
     """
     assert symbol is not None
-    assert base_quant_attrs is not None
-    assert quantize_op_name in ["Quantization_int8", "QIL", "QIL_V2", "PACT"]
-    if quantize_op_name in ["Quantization_int8", "QIL", "QIL_V2"]:
-        if quantize_op_name ==  "Quantization_int8":
-            # currently Quantization_int8 only support quant_mode = "minmax" and weight per tensor quantization method
-            base_quant_attrs["is_weight_perchannel"] = "False"
-            base_quant_attrs["quant_mode"] = "minmax"
-        base_quant_attrs["is_weight"] = "False"
-
-        data_quant_attrs = base_quant_attrs.copy()
-        weight_quant_attrs = base_quant_attrs.copy()
-        weight_quant_attrs["is_weight"] = "True"
-    elif quantize_op_name == "PACT":
-        data_quant_attrs = base_quant_attrs.copy()
-        weight_quant_attrs = base_quant_attrs.copy()
-        # weight_quant_attrs["nbits"] = str(int(weight_quant_attrs["nbits"]) - 1)
-        del weight_quant_attrs["lamda"]
+    assert weight_quant_attrs is not None
+    assert act_quant_attrs is not None
+    assert quantize_op_name in ("Quantization_int8", "QIL", "QIL_V2", "PACT")
 
     jgraph = json.loads(symbol.tojson())
     jnodes = jgraph["nodes"]
@@ -249,7 +235,7 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_at
                 visited_op_counts[op_name] <= skip_quantize_counts[op_name]:
                 print("skip idx:{} {} on {}".format(visited_op_counts[op_name], op_name, node_name))
                 quanted_children = children
-            elif op_name in ["Convolution", "FullyConnected", "Deconvolution"]:
+            elif op_name in ("Convolution", "FullyConnected", "Deconvolution"):
                 if len(children) == 2:
                     datavar, weightvar = children
                     biasvar = None
@@ -260,7 +246,7 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_at
                     print("{} has attached quantized node".format(data_name))
                     data_quanted = quantized_node_map[data_name]
                 else:
-                    data_quanted = create_quant_node(quantize_op_name, datavar, data_quant_attrs)
+                    data_quanted = create_quant_node(quantize_op_name, datavar, act_quant_attrs)
                     quantized_node_map[data_name] = data_quanted
                 if weight_name in quantized_node_map.keys():
                     print("{} has attached quantized node".format(weight_name))
@@ -270,7 +256,7 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_at
                     quantized_node_map[weight_name] = weight_quanted
                 print("attach quantize node for {} inputs:{}, {}".format(op_name, data_name, weight_name))
                 quanted_children = [data_quanted, weight_quanted, biasvar]
-            elif op_name in ["Concat", "Pooling", "add_n", "elemwise_add"]:
+            elif op_name in ("Concat", "Pooling", "add_n", "elemwise_add"):
                 quant_names = [var.name for var in children]
                 print("attach quantize node for {} inputs:{}".format(op_name, quant_names))
                 quanted_children = [None] * len(children)
@@ -279,7 +265,7 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, base_quant_at
                         print("{} has attached quantized node".format(var.name))
                         quanted_children[i] = quantized_node_map[var.name]
                     else:
-                        quanted_var = create_quant_node(quantize_op_name, var, data_quant_attrs)
+                        quanted_var = create_quant_node(quantize_op_name, var, act_quant_attrs)
                         quantized_node_map[var.name] = quanted_var
                         quanted_children[i] = quantized_node_map[var.name]
             

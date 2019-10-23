@@ -116,9 +116,10 @@ def main(config):
         _, out_shape, _ = symbol.get_internals().infer_shape(**worker_data_shape)
         out_shape_dictoinary = dict(zip(symbol.get_internals().list_outputs(), out_shape))
         symbol = attach_quantize_node(symbol, out_shape_dictoinary, config.quantize_op_name, 
-                                      config.base_quant_attrs, config.quantized_op, config.skip_quantize_counts)
-        # symbol.save("attach_quant.json")
-        # raise NotImplementedError
+                                      config.quant_attrs["weight_quant_attrs"], config.quant_attrs["act_quant_attrs"], 
+                                      config.quantized_op, config.skip_quantize_counts)
+        symbol.save("attach_quant.json")
+        raise NotImplementedError
 
     # symbol.save(config.network + ".json")
     # raise NotImplementedError
@@ -238,67 +239,6 @@ def main(config):
                num_epoch=config.num_epoch,
                kvstore=kv,
                allow_missing=config.allow_missing)
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Train Faster R-CNN network')
-    # general
-    parser.add_argument('--network', help='network name', default=config.network, type=str)
-    parser.add_argument('--dataset', help='dataset name', default=config.dataset, type=str)
-    parser.add_argument('--data_dir', help='dataset path', default=config.data_dir, type=str)
-    # training
-    parser.add_argument('--frequent', help='frequency of logging', default=config.frequent, type=int)
-    parser.add_argument('--kv_store', help='the kv-store type', default=config.kv_store, type=str)
-    parser.add_argument('--resume', help='continue training', action='store_true')
-    parser.add_argument('--gpus', help='GPU device to train with', default='-1', type=str)
-    parser.add_argument('--model_prefix', help='pretrained model prefix', default=config.model_prefix, type=str)
-    parser.add_argument('--model_load_epoch', help='pretrained model epoch', default=config.model_load_epoch, type=int)
-    parser.add_argument('--begin_epoch', help='begin epoch of training, use with resume', default=config.begin_epoch, type=int)
-    parser.add_argument('--num_epoch', help='end epoch of training', default=config.num_epoch, type=int)
-    parser.add_argument('--lr', help='base learning rate', default=config.lr, type=float)
-    parser.add_argument('--lr_scheduler', help='lr scheduler', default=config.lr_scheduler, type=str)
-    parser.add_argument('--optimizer', help='optimizer', default=config.optimizer, type=str)
-    parser.add_argument('--data_type', help='data type', default=config.data_type, type=str)
-    parser.add_argument('--grad_scale', help='grad scale for fp16', default=config.grad_scale, type=float)
-    parser.add_argument('--batch_per_gpu', help='batch size per gpu', default=config.batch_per_gpu, type=int)
-    parser.add_argument('--benchmark', help='test network without data', default=config.benchmark, type=int)
-    parser.add_argument('--quant_mode', help='the quantize mode for weight, bias and activation',
-                        default=config.quant_mode, type=str)
-    parser.add_argument('--delay_quant', help='after delay_quant iterations to execute quantization int8 op',
-                        default=config.delay_quant, type=int)
-    parser.add_argument('--grad_mode', help='the mode for gradient of quantized node',
-                        default=config.grad_mode, type=str)
-
-    # memory
-    parser.add_argument('--memonger', help='use memonger to put more images on a single GPU', default=config.memonger, type=int)
-    args = parser.parse_args()
-    return args
-
-def set_config(args):
-    config.network = args.network
-    config.dataset = args.dataset
-    config.data_dir = args.data_dir
-    config.frequent = args.frequent
-    config.kv_store = args.kv_store
-    if args.resume:
-        config.retrain = True
-    if args.gpus != '-1':
-        config.gpu_list = [int(devs_id) for devs_id in args.gpus.split(',')]
-    config.model_prefix = args.model_prefix
-    config.model_load_epoch = args.model_load_epoch
-    config.begin_epoch = args.begin_epoch
-    config.num_epoch = args.num_epoch
-    config.lr = args.lr
-    config.lr_scheduler = args.lr_scheduler
-    config.optimizer = args.optimizer
-    config.data_type = args.data_type
-    config.grad_scale = args.grad_scale
-    config.batch_per_gpu = args.batch_per_gpu
-    config.batch_size = config.batch_per_gpu * len(config.gpu_list)
-    config.memonger = args.memonger
-    config.benchmark = args.benchmark
-    config.quant_mode = args.quant_mode
-    config.delay_quant = args.delay_quant
-
 
 if __name__ == '__main__':
     # args = parse_args()
