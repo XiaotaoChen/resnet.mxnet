@@ -118,8 +118,8 @@ def main(config):
         symbol = attach_quantize_node(symbol, out_shape_dictoinary, config.quantize_op_name, 
                                       config.quant_attrs["weight_quant_attrs"], config.quant_attrs["act_quant_attrs"], 
                                       config.quantized_op, config.skip_quantize_counts)
-        symbol.save("attach_quant.json")
-        raise NotImplementedError
+        # symbol.save("attach_quant.json")
+        # raise NotImplementedError
 
     # symbol.save(config.network + ".json")
     # raise NotImplementedError

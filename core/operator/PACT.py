@@ -3,6 +3,10 @@ import numpy as np
 import copy
 
 
+def print_info(auto_grad, cal_grad, name):
+    print("{} autograd:\n{}\n cal grad:\n{}".format(name, auto_grad.asnumpy(), cal_grad.asnumpy()))
+    print("{} autograd - cal_grad:\n{}".format(name, auto_grad.asnumpy() - cal_grad.asnumpy()))
+
 def simulate_PACT(data, gamma, nbits):
     quant_level = 2**nbits - 1
     quant_unit = gamma / quant_level
@@ -163,3 +167,74 @@ class PACT_PYProp(mx.operator.CustomOpProp):
 
     def create_operator(self, ctx, shapes, dtypes):
         return PACT_PY(self.nbits, self.lamda)
+
+class PACT_V2_PY(mx.operator.CustomOp):
+    def __init__(self, nbits, lamda):
+        self.nbits = nbits
+        self.lamda = lamda
+        self.QUANT_LEVEL = 2**(self.nbits-1) -1
+        self.count=0
+
+        self.data = None
+        self.gamma = None
+        self.output = None
+
+    def forward(self, is_train, req, in_data, out_data, aux):
+        # self.assign(out_data[0], req[0], in_data[0])
+        # return
+        assert len(in_data) == 2, "the input must be 2 in PACT: data and gamma"
+        self.data = in_data[0]
+        self.gamma = in_data[1]
+        self.data.attach_grad()
+        self.gamma.attach_grad()
+
+        with mx.autograd.record():
+            #  the below two implement is equal. and its' gradients is equal with autograd.
+
+            data_sign = mx.nd.sign(self.data)
+            data_abs = mx.nd.abs(self.data)
+            self.output = mx.nd.where(data_abs < self.gamma, self.data, self.gamma.broadcast_like(self.data) * data_sign)
+            # low_bound = mx.nd.where(self.data > - self.gamma, self.data, - self.gamma.broadcast_like(self.data))
+            # self.output = mx.nd.where(low_bound < self.gamma, low_bound, self.gamma.broadcast_like(self.data))
+
+        quant_unit = self.gamma / self.QUANT_LEVEL
+        self.assign(out_data[0], req[0], mx.nd.round(self.output / quant_unit) * quant_unit)
+
+    def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
+        self.output.backward(out_grad[0])
+        self.assign(in_grad[0], req[0], self.data.grad)
+        self.assign(in_grad[1], req[1], self.gamma.grad)
+        # currently, ignore the lamda's influence
+
+        # # gamma_grad = 1 if data >= gamma
+        # # gamma_grad = -1 if data <= -gamma
+        # data = in_data[0]
+        # gamma = in_data[1]
+        # data_grad = out_grad[0] * (data < gamma) * (data > (-gamma))
+        # gamma_grad = mx.nd.sum(out_grad[0] * (data >= gamma) - out_grad[0] * (data <= -gamma))
+        
+        # print_info(self.gamma.grad, gamma_grad, "gamma")
+
+
+@mx.operator.register("PACT_V2_PY")
+class PACT_V2_PYProp(mx.operator.CustomOpProp):
+    def __init__(self, nbits="8", lamda="0.001"):
+        self.nbits = eval(nbits)
+        self.lamda = eval(lamda)
+        super(PACT_V2_PYProp, self).__init__(True)
+    def list_arguments(self):
+        return ['data', "gamma"]
+    def list_outputs(self):
+        return ['output']
+    def list_auxiliary_states(self):
+        return []
+    def infer_shape(self, in_shape):
+        shape = in_shape[0]
+        return [shape, [1]], [shape], []
+    def infer_type(self, in_type):
+        dtype = in_type[0]
+        return [dtype] * len(in_type), [in_type[0]]*len(self.list_outputs()), \
+            [in_type[0]]*len(self.list_auxiliary_states())
+
+    def create_operator(self, ctx, shapes, dtypes):
+        return PACT_V2_PY(self.nbits, self.lamda)

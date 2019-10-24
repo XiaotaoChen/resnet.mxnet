@@ -22,9 +22,14 @@ def assert_all(pruning_point, clipping_point):
         than clipping".format(pruning[0], clipping[0])
     assert np.all(clipping <= 1), "clipping {} must less than 1.0".format(clipping[0])
 
-def interval_quantize(interval_data, sign_data, pruning_point, clipping_point, quant_level):
+def interval_quantize_signed(interval_data, sign_data, pruning_point, clipping_point, quant_level):
     interval = (clipping_point - pruning_point) / quant_level
     return mx.nd.round( (interval_data - pruning_point * sign_data) / interval ) * interval + pruning_point * sign_data
+
+def interval_quantize(interval_data, pruning_point, clipping_point, quant_level):
+    interval = (clipping_point - pruning_point) / quant_level
+    return mx.nd.round( (interval_data - pruning_point) / interval ) * interval + pruning_point
+
 
 class QIL_PY(mx.operator.CustomOp):
     def __init__(self, is_weight, fix_gamma, nbits):
@@ -32,96 +37,119 @@ class QIL_PY(mx.operator.CustomOp):
         self.fix_gamma = fix_gamma
         self.nbits = nbits
         self.QUANT_LEVEL = 2**self.nbits -1
-        self.init = True
-        self.count = 0
 
-        self.max = 0
+
+        self.data = None
+        self.pruning_point = None
+        self.clipping_point = None
+        self.output = None
+
+        self.count = 0
+        self.quantized_type = "ste"
 
     def forward(self, is_train, req, in_data, out_data, aux):
-        # self.assign(out_data[0], req[0], in_data[0])
-        # return
-        data = in_data[0]
-        if is_train and self.init:
-            # in_data[1][:] = mx.nd.min(mx.nd.abs(data))
-            # in_data[2][:] = mx.nd.max(mx.nd.abs(data))
-            in_data[1][:] = mx.nd.array([0])
-            in_data[2][:] = mx.nd.array([1.0])
-            in_data[3][:] = mx.nd.array([1.0])
-            self.init = False
-        pruning_point = in_data[1]
-        clipping_point = in_data[2]
+        if in_data[1].asnumpy()[0] < 0:
+            in_data[1][:] = 0.0
+        if in_data[2].asnumpy()[0] > 1.0:
+            in_data[2][:] = 1.0
+
+        assert in_data[1].asnumpy()[0] < in_data[2].asnumpy()[0], "pruning_point vs clipping_point, {} vs {}".format( \
+                                                                  in_data[1].asnumpy()[0], in_data[2].asnumpy()[0])
+
+        self.data = in_data[0]
+        self.pruning_point = in_data[1]
+        self.clipping_point = in_data[2]
         gamma = in_data[3]
 
-        self.max = mx.nd.max(mx.nd.abs(data))
-        data = data / self.max
-
+        self.data.attach_grad()
+        self.pruning_point.attach_grad()
+        self.clipping_point.attach_grad()
         
-        pruning = pruning_point.asnumpy()
-        clipping = clipping_point.asnumpy()
-        if pruning[0] < 0:
-            # print("bad pruning < 0, {}".format(pruning[0]) )
-            in_data[1][:] = mx.nd.zeros_like(in_data[1])[:]
-            pruning_point = in_data[1]
-        # else:
-        #     print("great pruning >= 0. {}".format(pruning[0]))
-        if clipping[0] > 1:
-            # print("bad clipping > 1, {}".format(clipping[0]))
-            in_data[2][:] = mx.nd.ones_like(in_data[2])[:]
-            clipping_point = in_data[2]
-        # else:
-        #     print("great clipping <= 1.{}".format(clipping[0]))
+        # print("count:{}, pruning:{}, clippig:{}".format(self.count, self.pruning_point.asnumpy()[0], self.clipping_point.asnumpy()[0]))
+        # self.count += 1
 
-        center = 0.5 * (clipping_point + pruning_point)
-        distance = 0.5 * (clipping_point - pruning_point)
-        alpha = 0.5 / distance
-        beta = -0.5 * center / distance + 0.5
-
-        data_abs = mx.nd.abs(data)
-        data_sign = mx.nd.sign(data)
-        interval_data = data_abs * (data_abs > pruning_point) * (data_abs < clipping_point)
-        if self.is_weight:
-            transformed_data = data_sign * (data_abs > clipping_point) + \
-                               data_sign * (alpha * interval_data + beta)
-            # transformed_data = data_sign * (data_abs > clipping_point) + \
-            #                    data_sign * mx.nd.power((alpha * interval_data + beta), gamma)
-            self.assign(out_data[0], req[0], (mx.nd.round(transformed_data * self.QUANT_LEVEL) / 
-                                                  self.QUANT_LEVEL) )
+        with mx.autograd.record():
+            center = 0.5 * (self.clipping_point + self.pruning_point)
+            distance = 0.5 * (self.clipping_point - self.pruning_point)
+            alpha = 0.5 / distance
+            beta =  -0.5 * center / distance + 0.5
+            data_abs = mx.nd.abs(self.data)
+            data_sign = mx.nd.sign(self.data)
+            interval_flag = (data_abs >= self.pruning_point) * (data_abs <= self.clipping_point)
+            self.output = data_sign * (data_abs > self.clipping_point) + \
+                          data_sign * (alpha * data_abs + beta) * interval_flag
+        if self.quantized_type == "interval":
+            self.assign(out_data[0], req[0], interval_quantize(self.output * data_sign, self.pruning_point,
+                                                               self.clipping_point, self.QUANT_LEVEL) * data_sign)
         else:
-            transformed_data = data_sign * (data_abs > clipping_point) + \
-                               data_sign * (alpha * interval_data + beta)
-            self.assign(out_data[0], req[0], (mx.nd.round(transformed_data * self.QUANT_LEVEL) / 
-                                                 self.QUANT_LEVEL) )
+            self.assign(out_data[0], req[0], mx.nd.round(self.output * self.QUANT_LEVEL) / self.QUANT_LEVEL)
+        
+        # pruning = pruning_point.asnumpy()
+        # clipping = clipping_point.asnumpy()
+        # if pruning[0] < 0:
+        #     in_data[1][:] = mx.nd.zeros_like(in_data[1])[:]
+        #     pruning_point = in_data[1]
+        # if clipping[0] > 1:
+        #     in_data[2][:] = mx.nd.ones_like(in_data[2])[:]
+        #     clipping_point = in_data[2]
+
+        # center = 0.5 * (clipping_point + pruning_point)
+        # distance = 0.5 * (clipping_point - pruning_point)
+        # alpha = 0.5 / distance
+        # beta = -0.5 * center / distance + 0.5
+
+        # data_abs = mx.nd.abs(data)
+        # data_sign = mx.nd.sign(data)
+        # interval_data = data_abs * (data_abs > pruning_point) * (data_abs < clipping_point)
+        # if self.is_weight:
+        #     transformed_data = data_sign * (data_abs > clipping_point) + \
+        #                        data_sign * (alpha * interval_data + beta)
+        #     # transformed_data = data_sign * (data_abs > clipping_point) + \
+        #     #                    data_sign * mx.nd.power((alpha * interval_data + beta), gamma)
+        #     self.assign(out_data[0], req[0], (mx.nd.round(transformed_data * self.QUANT_LEVEL) / 
+        #                                           self.QUANT_LEVEL) )
+        # else:
+        #     transformed_data = data_sign * (data_abs > clipping_point) + \
+        #                        data_sign * (alpha * interval_data + beta)
+        #     self.assign(out_data[0], req[0], (mx.nd.round(transformed_data * self.QUANT_LEVEL) / 
+        #                                          self.QUANT_LEVEL) )
 
     def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
-        self.count += 1
         assert len(req) >= 3
         assert self.fix_gamma == True, "currently only support fix gamma"
 
-        data = in_data[0]
-        pruning_point = in_data[1]
-        clipping_point = in_data[2]
-        gamma = in_data[3]
+        self.output.backward(out_grad[0])
+        self.assign(in_grad[0], req[0], self.data.grad)
+        self.assign(in_grad[1], req[1], self.pruning_point.grad)
+        self.assign(in_grad[2], req[2], self.clipping_point.grad)
 
-        data = data / self.max
-        data_abs = mx.nd.abs(data)
-        data_sign = mx.nd.sign(data)
-        interval_flag = (data_abs > pruning_point) * (data_abs < clipping_point)
+        # data = in_data[0]
+        # pruning_point = in_data[1]
+        # clipping_point = in_data[2]
+        # gamma = in_data[3]
+
+        # data_abs = mx.nd.abs(data)
+        # data_sign = mx.nd.sign(data)
+        # interval_flag = (data_abs >= pruning_point) * (data_abs <= clipping_point)
         
-        interval_grad = interval_flag * out_grad[0]
-        # data = interval_flag * data # there is no need to get interval data
+        # data_grad = out_grad[0] / clipping_point * interval_flag
 
-        pruning_grad = mx.nd.sum(interval_grad * ( (data - clipping_point* data_sign) /
-                                                  ((clipping_point - pruning_point)**2) ) )
-        clipping_grad = mx.nd.sum(interval_grad * (- (data - pruning_point * data_sign) / 
-                                                    ((clipping_point - pruning_point)**2) ) )
+        # pruning_grad = mx.nd.sum(out_grad[0] * ( (data - clipping_point* data_sign) /
+        #                                           ((clipping_point - pruning_point)**2) ) * interval_flag )
+        # clipping_grad = mx.nd.sum(out_grad[0] * (- (data - pruning_point * data_sign) / 
+        #                                             ((clipping_point - pruning_point)**2) ) * interval_flag )
 
-        self.assign(in_grad[0], req[0], interval_grad / (clipping_point - pruning_point) / self.max)
-        # print("pruning grad:{}, clipping_grad:{}, pruning:{}, clipping:{}, sum(interval_grad):{}".format(
-        #       pruning_grad.asnumpy()[0], clipping_grad.asnumpy()[0], 
-        #       pruning_point.asnumpy()[0], clipping_point.asnumpy()[0],
-        #       mx.nd.sum(interval_grad).asnumpy()[0]))
-        self.assign(in_grad[1], req[1], pruning_grad)
-        self.assign(in_grad[2], req[2], clipping_grad)
+        # print("data:\n{}\n pruning_point:{}, clipping_point:{}".format(data, pruning_point.asnumpy()[0], clipping_point.asnumpy()[0]))
+        # print("out grad:\n{}\nsign:\n{}\n interval flag:\n{}".format(out_grad[0], data_sign, interval_flag))
+
+
+        # print("data.grad:\n{}\n cal data grad:\n{}".format(self.data.grad, data_grad))
+        # print("data.grad - cal_grad:\n{}".format(self.data.grad - data_grad))
+
+        # print("pruning_point.grad:\n{}\n cal pruning grad:\n{}".format(self.pruning_point.grad, pruning_grad))
+        # print("pruning_point.grad - cal_grad:\n{}".format(self.pruning_point.grad - pruning_grad))
+        # print("clipping_point.grad:\n{}\n cal clipping grad:\n{}".format(self.clipping_point.grad, clipping_grad))
+        # print("clipping_point.grad - cal_grad:\n{}".format(self.clipping_point.grad - clipping_grad))
         
 @mx.operator.register("QIL_PY")
 class QIL_PYProp(mx.operator.CustomOpProp):
