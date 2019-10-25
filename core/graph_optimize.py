@@ -21,7 +21,9 @@ import mxnet as mx
 
 from .operator.QIL import *
 from .operator.QIL_V2 import *
+from .operator.QIL_V3 import *
 from .operator.PACT import * # PACT_PY, DoReFa_PY
+from .operator.WNQ import *
 
 FLOAT32_DTYPE = 0
 INIT_ZERO = '[\"zero\", {}]'
@@ -167,8 +169,8 @@ def create_quant_node(quantize_op_name, var, attrs):
         minmax_var = mx.sym.var(name = var.name + MINMAX_SUFFIX, init=INIT_ZERO)
         quanted_node = mx.sym.contrib.Quantization_int8(data=var, minmax=minmax_var, **attrs, name=var.name)
     elif quantize_op_name == "QIL":
-        pruning_var = mx.sym.var(name = var.name + QIL_PRUNING, init=INIT_ZERO, lr_mult=0.01, wd_mult=0)
-        clipping_var = mx.sym.var(name = var.name + QIL_CLIPPING, init=INIT_ONE, lr_mult=0.01, wd_mult=0)
+        pruning_var = mx.sym.var(name = var.name + QIL_PRUNING, init=get_constant(0), lr_mult=0.01, wd_mult=0)
+        clipping_var = mx.sym.var(name = var.name + QIL_CLIPPING, init=get_constant(1), lr_mult=0.01, wd_mult=0)
         gamma_var = mx.sym.var(name = var.name + QIL_GAMMA, init=INIT_ONE)
         quanted_node = mx.sym.Custom(data=var, pruning_point=pruning_var,
                                      clipping_point=clipping_var,
@@ -180,16 +182,36 @@ def create_quant_node(quantize_op_name, var, attrs):
         quanted_node = mx.sym.Custom(data=var, center=center_var,
                                      distance=distance_var, gamma=gamma_var, 
                                      **attrs, name=var.name, op_type='QIL_V2_PY')
+    elif quantize_op_name == "QIL_V3":
+        ep_var = mx.sym.var(name = var.name + "_ep", init=get_constant(-5), lr_mult=0.01, wd_mult=0)
+        if "weight" in var.name:
+            ed_var = mx.sym.var(name = var.name + "_ed", init=get_constant(0), lr_mult=0.01, wd_mult=0)
+        else:
+            ed_var = mx.sym.var(name = var.name + "_ed", init=get_constant(2), lr_mult=0.01, wd_mult=0)
+        gamma_var = mx.sym.var(name = var.name + QIL_GAMMA, init=INIT_ONE)
+        quanted_node = mx.sym.Custom(data=var, ep=ep_var,
+                                     ed=ed_var,
+                                     gamma=gamma_var, **attrs, name=var.name, op_type='QIL_V3_PY')
     elif quantize_op_name == "PACT":
         if "weight" in var.name:
             # DoReFa quantize
             # return var
             quanted_node = mx.sym.Custom(data=var, **attrs, name=var.name, op_type="DoReFa_PY")
+            # gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(0.5), wd_mult=float(attrs["lamda"]))
+            # quanted_node = mx.sym.Custom(data=var, gamma=gamma_var, **attrs, name=var.name, op_type="PACT_V2_PY")
+            # quanted_node = mx.sym.Custom(data=var, **attrs, name=var.name, op_type="QUANT_STE_PY")
         else:
             # PACT_ACT
             # return var
             gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(8.0), wd_mult=float(attrs["lamda"]))
             quanted_node = mx.sym.Custom(data=var, gamma=gamma_var, **attrs, name=var.name, op_type="PACT_PY")
+    elif quantize_op_name == "WNQ":
+        if "weight" in var.name:
+            quanted_node = mx.sym.Custom(data=var, **attrs, name=var.name, op_type="WNQ_PY")
+        else:
+            return var
+
+    
     return quanted_node
 
 def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, weight_quant_attrs, act_quant_attrs, 
@@ -202,7 +224,7 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, weight_quant_
     assert symbol is not None
     assert weight_quant_attrs is not None
     assert act_quant_attrs is not None
-    assert quantize_op_name in ("Quantization_int8", "QIL", "QIL_V2", "PACT")
+    assert quantize_op_name in ("Quantization_int8", "QIL", "QIL_V2", "QIL_V3", "PACT", "WNQ")
 
     jgraph = json.loads(symbol.tojson())
     jnodes = jgraph["nodes"]

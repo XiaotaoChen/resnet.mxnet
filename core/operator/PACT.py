@@ -168,6 +168,7 @@ class PACT_PYProp(mx.operator.CustomOpProp):
     def create_operator(self, ctx, shapes, dtypes):
         return PACT_PY(self.nbits, self.lamda)
 
+
 class PACT_V2_PY(mx.operator.CustomOp):
     def __init__(self, nbits, lamda):
         self.nbits = nbits
@@ -215,7 +216,6 @@ class PACT_V2_PY(mx.operator.CustomOp):
         
         # print_info(self.gamma.grad, gamma_grad, "gamma")
 
-
 @mx.operator.register("PACT_V2_PY")
 class PACT_V2_PYProp(mx.operator.CustomOpProp):
     def __init__(self, nbits="8", lamda="0.001"):
@@ -238,3 +238,43 @@ class PACT_V2_PYProp(mx.operator.CustomOpProp):
 
     def create_operator(self, ctx, shapes, dtypes):
         return PACT_V2_PY(self.nbits, self.lamda)
+
+
+
+class QUANT_STE_PY(mx.operator.CustomOp):
+    def __init__(self, nbits):
+        self.nbits = nbits
+        self.QUANT_LEVEL = 2**(self.nbits-1) -1
+        self.count=0
+
+
+    def forward(self, is_train, req, in_data, out_data, aux):
+        data = in_data[0]
+        max_abs = mx.nd.max(mx.nd.abs(data))
+        quant_unit = max_abs / self.QUANT_LEVEL
+        self.assign(out_data[0], req[0], mx.nd.round(data / quant_unit) * quant_unit)
+
+    def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
+        self.assign(in_grad[0], req[0], out_grad[0])
+
+@mx.operator.register("QUANT_STE_PY")
+class QUANT_STE_PYProp(mx.operator.CustomOpProp):
+    def __init__(self, nbits="8"):
+        self.nbits = eval(nbits)
+        super(QUANT_STE_PYProp, self).__init__(True)
+    def list_arguments(self):
+        return ['data']
+    def list_outputs(self):
+        return ['output']
+    def list_auxiliary_states(self):
+        return []
+    def infer_shape(self, in_shape):
+        shape = in_shape[0]
+        return [shape], [shape], []
+    def infer_type(self, in_type):
+        dtype = in_type[0]
+        return [dtype] * len(in_type), [in_type[0]]*len(self.list_outputs()), \
+            [in_type[0]]*len(self.list_auxiliary_states())
+
+    def create_operator(self, ctx, shapes, dtypes):
+        return QUANT_STE_PY(self.nbits)
