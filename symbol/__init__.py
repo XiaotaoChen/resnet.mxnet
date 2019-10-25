@@ -1,5 +1,6 @@
 from .resnet import resnet
 from .resnet import resnet_cifar10
+from .resnet import resnet_imagenet
 from .resnext import resnext
 from .resnext_cyt import resnext as resnext_cyt
 from .resnet_mxnet import resnet_mxnet
