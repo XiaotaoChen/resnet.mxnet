@@ -4,23 +4,23 @@ config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 # config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
-config.gpu_list = [5]
+config.gpu_list = [0, 1, 2, 3]
 config.platform = "aliyun"
-config.dataset = "cifar10" # imagenet , cifar10 , cifar100 
-config.network = "resnet_cifar10" # "resnet_cifar10"  # "cifar10_sym"  # "resnet"
-config.depth = 20
+config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
+config.network = "resnet_imagenet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "resnet_imagenet"
+config.depth = 18
 # if config.dataset == "imagenet":
 #     config.depth = 18
 # elif config.dataset == "cifar10" :
 #     config.depth = 50
 # elif config.dataset == "cifar100":
 #     config.depth = 18
-config.model_load_epoch =200
+config.model_load_epoch =6
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
 # "experiments/1017_resnet20_cifar10/resnet20_cifar10"   
 # "experiments/1017_cifar10_sym50_cifar10_QIL/cifar10_sym50_cifar10"
 # "model/1011_resnet18_imagenet_fp32/1011_resnet18_imagenet"  
-config.model_load_prefix =  "experiments/1023_resnet_cifar1020_cifar10/resnet_cifar1020_cifar10"  
+config.model_load_prefix =  "experiments/1024_w4_act4_pact_resnet50_imagenet_PACT/resnet50_imagenet"  
 config.retrain = False
 config.allow_missing = True
 # config.use_global_stats=False
@@ -119,7 +119,7 @@ elif config.dataset == "cifar10":
         config.filter_list = [16, 16, 32, 64]
         config.bottle_neck = False
     else:
-        raise ValueError("no experiments done on detph {}, you can do it youself".format(args.depth))
+        raise ValueError("no experiments done on detph {}, you can do it youself".format(config.depth))
     config.units = per_unit*3
 elif config.dataset == "cifar100":
     config.num_classes = 100
@@ -140,9 +140,6 @@ elif config.dataset == "cifar100":
 else:
     raise ValueError("do not support {} yet".format(config.dataset))
 
-
-# for quantize int8 training
-config.quantize_flag = True
 '''
 delya_quant: after delay_quant iters, the quantization working actually.
 ema_decay:  the hyperparameter for activation threshold update.
@@ -186,31 +183,45 @@ QIL_quant_attrs = {
 
 PACT_quant_attrs = { 
     "weight_quant_attrs": {
-        "nbits": "4"
+        "nbits": "3"
     }, 
     "act_quant_attrs": {
-        "nbits": "4",
+        "nbits": "3",
         "lamda": "0.01"
     }
 }
 
+WNQ_quant_attrs = { 
+    "weight_quant_attrs": {
+        "nbits": "3",
+        "is_perchannel": "True"
+    }, 
+    "act_quant_attrs": { }
+}
+
+
 quantize_attrs = {"Quantization_int8" : quantization_int8_quant_attrs, 
                   "QIL": QIL_quant_attrs, 
                   "QIL_V2": QIL_quant_attrs,
-                  "PACT": PACT_quant_attrs}
+                  "QIL_V3": QIL_quant_attrs,
+                  "PACT": PACT_quant_attrs,
+                  "WNQ": WNQ_quant_attrs}
 
-config.quantize_op_name = "PACT"  # "Quantization_int8"  # "QIL" # "QIL_V2"
+
+# for quantize int8 training
+config.quantize_flag = False
+config.quantize_op_name = "WNQ"  # "Quantization_int8"  # "QIL" # "QIL_V2" "WNQ"
 config.quant_attrs = quantize_attrs[config.quantize_op_name]
 
 # config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
-config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
+config.skip_quantize_counts = {"Convolution": 0, "FullyConnected": 0}
 config.fix_bn = False
-# config.output_dir = "1023_" + config.model_prefix
-config.output_dir = "1023_w4_act4_pact_" + config.model_prefix + "_" + config.quantize_op_name
+config.output_dir = "1026_" + config.model_prefix
+# config.output_dir = "1026_3bits_" + config.model_prefix + "_" + config.quantize_op_name
 # config.output_dir = "test"
 
-if config.quantize_flag and config.retrain:
-    config.lr *= 0.1
-    config.lr_step = [240, 280]
-    config.num_epoch = 300
+# if config.quantize_flag and config.retrain:
+#     config.lr *= 0.1
+#     config.lr_step = [240, 280]
+#     config.num_epoch = 300
