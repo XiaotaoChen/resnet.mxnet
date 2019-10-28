@@ -147,7 +147,7 @@ def resnet_cifar10(units, num_stage, filter_list, num_classes, data_type, bottle
     cls = mx.symbol.SoftmaxOutput(data=fc1, name='softmax')
     return cls
 
-def resnet_imagenet(units, num_stage, filter_list, num_classes, data_type, bottle_neck=True,
+def preact_resnet(units, num_stage, filter_list, num_classes, data_type, bottle_neck=True,
            bn_mom=0.9, workspace=512, memonger=False, grad_scale=1.0, dataset_type=None):
     print("units:{}, num_stage:{}, filter_list:{}, bottle_neck:{}".format(units, num_stage, filter_list, bottle_neck))
 

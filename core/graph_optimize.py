@@ -24,6 +24,8 @@ from .operator.QIL_V2 import *
 from .operator.QIL_V3 import *
 from .operator.PACT import * # PACT_PY, DoReFa_PY
 from .operator.WNQ import *
+from .operator.GDRQ import *
+
 
 FLOAT32_DTYPE = 0
 INIT_ZERO = '[\"zero\", {}]'
@@ -210,7 +212,12 @@ def create_quant_node(quantize_op_name, var, attrs):
             quanted_node = mx.sym.Custom(data=var, **attrs, name=var.name, op_type="WNQ_PY")
         else:
             return var
-
+    elif quantize_op_name == "GDRQ":
+        if "weight" in var.name:
+            alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(0.5), dtype="float32")
+        else:
+            alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(8.0), dtype="float32")
+        quanted_node = mx.sym.Custom(data=var, alpha=alpha_var, **attrs, name=var.name, op_type="GDRQ_PY")
     
     return quanted_node
 
@@ -224,7 +231,7 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, weight_quant_
     assert symbol is not None
     assert weight_quant_attrs is not None
     assert act_quant_attrs is not None
-    assert quantize_op_name in ("Quantization_int8", "QIL", "QIL_V2", "QIL_V3", "PACT", "WNQ")
+    assert quantize_op_name in ("Quantization_int8", "QIL", "QIL_V2", "QIL_V3", "PACT", "WNQ", "GDRQ")
 
     jgraph = json.loads(symbol.tojson())
     jnodes = jgraph["nodes"]
