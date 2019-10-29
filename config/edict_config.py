@@ -4,7 +4,7 @@ config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 # config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
-config.gpu_list = [0]
+config.gpu_list = [7]
 config.platform = "aliyun"
 config.dataset = "cifar10" # imagenet , cifar10 , cifar100 
 config.network = "resnet_cifar10" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
@@ -15,12 +15,12 @@ config.depth = 20
 #     config.depth = 50
 # elif config.dataset == "cifar100":
 #     config.depth = 18
-config.model_load_epoch =100
+config.model_load_epoch =59
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
 # "experiments/1017_resnet20_cifar10/resnet20_cifar10"   
 # "experiments/1017_cifar10_sym50_cifar10_QIL/cifar10_sym50_cifar10"
 # "model/1011_resnet18_imagenet_fp32/1011_resnet18_imagenet"  
-config.model_load_prefix =  "experiments/1028_resnet18_resnet18_cifar100/resnet18_cifar100"  
+config.model_load_prefix =  "experiments/PACT/1029_2bits_resnet_cifar1020_cifar10/resnet_cifar1020_cifar10"  
 config.retrain = False
 config.allow_missing = True
 # config.use_global_stats=False
@@ -43,7 +43,7 @@ else:
         config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar10"
     elif config.dataset == "cifar100":
         config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar100"
-config.batch_per_gpu = 128
+config.batch_per_gpu = 256
 config.batch_size = config.batch_per_gpu * len(config.gpu_list)
 config.kv_store = 'local'
 
@@ -143,108 +143,25 @@ elif config.dataset == "cifar100":
 else:
     raise ValueError("do not support {} yet".format(config.dataset))
 
-'''
-delya_quant: after delay_quant iters, the quantization working actually.
-ema_decay:  the hyperparameter for activation threshold update.
-grad_mode:  the mode for gradients pass. there are two mode: ste or clip. 
-            ste mean straightforward pass the out gradients to data,
-            clip mean only pass the gradients whose value of data in the range of [-threshold, threshold],
-                        the gradients of outer is settting to 0.
-workspace:  the temporary space used in grad_mode=clip
-'''
-quantization_int8_quant_attrs = {
-    "weight_quant_attrs": {
-        "delay_quant": "0", 
-        "ema_decay": "0.99",
-        "grad_mode": "clip",
-        "is_weight": "True",
-        "is_weight_perchannel": "False",
-        "quant_mode": "minmax"
-    }, 
-    "act_quant_attrs": {
-        "delay_quant": "0", 
-        "ema_decay": "0.99",
-        "grad_mode": "clip",
-        "is_weight": "False",
-        "is_weight_perchannel": "False",
-        "quant_mode": "minmax"
-    }
-}
-
-QIL_quant_attrs = {
-    "weight_quant_attrs": {
-        "fix_gamma": "True", 
-        "nbits": "4",
-        "is_weight": "True"
-    }, 
-    "act_quant_attrs": {
-        "fix_gamma": "True", 
-        "nbits": "4",
-        "is_weight": "False"
-    }
-}
-
-PACT_quant_attrs = { 
-    "weight_quant_attrs": {
-        "nbits": "2"
-    }, 
-    "act_quant_attrs": {
-        "nbits": "2",
-        "lamda": "0.01"
-    }
-}
-
-WNQ_quant_attrs = { 
-    "weight_quant_attrs": {
-        "nbits": "3",
-        "is_perchannel": "True"
-    }, 
-    "act_quant_attrs": { }
-}
-
-GDRQ_quant_attrs = { 
-    "weight_quant_attrs": {
-        "nbits": "2",
-        "group_size": "-1",
-        "is_weight": "True",
-        "lamda": "0.01"
-    }, 
-    # "act_quant_attrs": {
-    #     "nbits": "2",
-    #     "group_size": "-1",
-    #     "is_weight": "False",
-    #     "lamda": "0.01"
-    # }
-    "act_quant_attrs": {
-        "nbits": "2",
-        "threshold": "8.0"
-    }
-}
-
-
-quantize_attrs = {"Quantization_int8" : quantization_int8_quant_attrs, 
-                  "QIL": QIL_quant_attrs, 
-                  "QIL_V2": QIL_quant_attrs,
-                  "QIL_V3": QIL_quant_attrs,
-                  "PACT": PACT_quant_attrs,
-                  "WNQ": WNQ_quant_attrs,
-                  "GDRQ": GDRQ_quant_attrs}
 
 
 # for quantize int8 training
 config.quantize_flag = True
-config.quantize_op_name = "GDRQ"  # "Quantization_int8"  # "QIL" # "QIL_V2" "WNQ" "GDRQ"
-config.quant_attrs = quantize_attrs[config.quantize_op_name]
+config.quantize_op_name = "PACT"  # "Quantization_int8"  # "QIL" # "QIL_V2" "WNQ" "GDRQ"
+config.nbits = 4
+from .quant_attrs import get_quantize_attrs
+config.quant_attrs = get_quantize_attrs(config.quantize_op_name, config.nbits)
 
 # config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
 config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
 config.fix_bn = False
 # config.output_dir = "1028_resnet18_" + config.model_prefix
-# config.output_dir = "{}/1029_2bits_{}".format(config.quantize_op_name, config.model_prefix)
-config.output_dir = "test"
+config.output_dir = "{}/1029_{}bits_no_wd_{}_bs{}".format(config.quantize_op_name, config.nbits, config.model_prefix, 
+                                                           config.batch_per_gpu * len(config.gpu_list))
+# config.output_dir = "temp"
 
-if config.quantize_flag and config.retrain:
-    config.lr *= 0.1
-    config.lr_step = [120, 140]
-    config.num_epoch = 150
+# if config.quantize_flag and config.retrain:
+#     config.lr *= 0.1
+#     config.lr_step = [120, 140]
+#     config.num_epoch = 150

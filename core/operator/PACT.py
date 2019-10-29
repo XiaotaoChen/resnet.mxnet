@@ -100,9 +100,8 @@ class DoReFa_PYProp(mx.operator.CustomOpProp):
 
 
 class PACT_PY(mx.operator.CustomOp):
-    def __init__(self, nbits, lamda):
+    def __init__(self, nbits):
         self.nbits = nbits
-        self.lamda = lamda
         self.QUANT_LEVEL = 2**self.nbits -1
         self.count=0
 
@@ -131,7 +130,6 @@ class PACT_PY(mx.operator.CustomOp):
     def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
         # self.assign(in_grad[0], req[0], out_grad[0])
         # return
-        # currently, ignore the lamda's influence
 
         # cliped_flag = data >= gamma
         # # gamma_grad = 1 if data >= gamma
@@ -147,9 +145,8 @@ class PACT_PY(mx.operator.CustomOp):
         
 @mx.operator.register("PACT_PY")
 class PACT_PYProp(mx.operator.CustomOpProp):
-    def __init__(self, nbits="8", lamda="0.001"):
+    def __init__(self, nbits="8"):
         self.nbits = eval(nbits)
-        self.lamda = eval(lamda)
         super(PACT_PYProp, self).__init__(True)
     def list_arguments(self):
         return ['data', "gamma"]
@@ -166,14 +163,13 @@ class PACT_PYProp(mx.operator.CustomOpProp):
             [in_type[0]]*len(self.list_auxiliary_states())
 
     def create_operator(self, ctx, shapes, dtypes):
-        return PACT_PY(self.nbits, self.lamda)
+        return PACT_PY(self.nbits)
 
 
 class PACT_V2_PY(mx.operator.CustomOp):
-    def __init__(self, nbits, lamda):
+    def __init__(self, nbits):
         self.nbits = nbits
-        self.lamda = lamda
-        self.QUANT_LEVEL = 2**(self.nbits-1) -1
+        self.QUANT_LEVEL = 2**(self.nbits) -1
         self.count=0
 
         self.data = None
@@ -205,7 +201,6 @@ class PACT_V2_PY(mx.operator.CustomOp):
         self.output.backward(out_grad[0])
         self.assign(in_grad[0], req[0], self.data.grad)
         self.assign(in_grad[1], req[1], self.gamma.grad)
-        # currently, ignore the lamda's influence
 
         # # gamma_grad = 1 if data >= gamma
         # # gamma_grad = -1 if data <= -gamma
@@ -218,9 +213,8 @@ class PACT_V2_PY(mx.operator.CustomOp):
 
 @mx.operator.register("PACT_V2_PY")
 class PACT_V2_PYProp(mx.operator.CustomOpProp):
-    def __init__(self, nbits="8", lamda="0.001"):
+    def __init__(self, nbits="8"):
         self.nbits = eval(nbits)
-        self.lamda = eval(lamda)
         super(PACT_V2_PYProp, self).__init__(True)
     def list_arguments(self):
         return ['data', "gamma"]
@@ -237,7 +231,7 @@ class PACT_V2_PYProp(mx.operator.CustomOpProp):
             [in_type[0]]*len(self.list_auxiliary_states())
 
     def create_operator(self, ctx, shapes, dtypes):
-        return PACT_V2_PY(self.nbits, self.lamda)
+        return PACT_V2_PY(self.nbits)
 
 
 

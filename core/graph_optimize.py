@@ -205,7 +205,7 @@ def create_quant_node(quantize_op_name, var, attrs):
         else:
             # PACT_ACT
             # return var
-            gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(8.0), wd_mult=float(attrs["lamda"]))
+            gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(8.0))
             quanted_node = mx.sym.Custom(data=var, gamma=gamma_var, **attrs, name=var.name, op_type="PACT_PY")
     elif quantize_op_name == "WNQ":
         if "weight" in var.name:
