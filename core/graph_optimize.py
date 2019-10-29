@@ -215,10 +215,12 @@ def create_quant_node(quantize_op_name, var, attrs):
     elif quantize_op_name == "GDRQ":
         if "weight" in var.name:
             alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(0.5), dtype="float32")
+            quanted_node = mx.sym.Custom(data=var, alpha=alpha_var, **attrs, name=var.name, op_type="GDRQ_PY")
         else:
-            alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(8.0), dtype="float32")
-        quanted_node = mx.sym.Custom(data=var, alpha=alpha_var, **attrs, name=var.name, op_type="GDRQ_PY")
-    
+            # quanted_node = var
+            # alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(8.0), dtype="float32")
+            # quanted_node = mx.sym.Custom(data=var, alpha=alpha_var, **attrs, name=var.name, op_type="GDRQ_PY")
+            quanted_node = mx.sym.Custom(data=var, **attrs, name=var.name, op_type="CLIP_RELU_PY")
     return quanted_node
 
 def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, weight_quant_attrs, act_quant_attrs, 

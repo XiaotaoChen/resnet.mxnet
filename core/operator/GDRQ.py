@@ -64,7 +64,7 @@ class GDRQ_PY(mx.operator.CustomOp):
 
         if self.group_size == -1:
             mean = mx.nd.mean(data_abs)
-            threshold = 2 * mean
+            threshold = 3 * mean
             if self.is_weight:
                 alpha[:] = threshold
             else:
@@ -87,7 +87,7 @@ class GDRQ_PY(mx.operator.CustomOp):
 
             axises = tuple([i for i in range(len(reshaped_shape))])
             mean = mx.nd.mean(reshaped_data_abs, axis=axises[1:])
-            threshold = 2 * mean
+            threshold = 3 * mean
             if self.is_weight:
                 alpha[:] = threshold
             else:
@@ -109,6 +109,9 @@ class GDRQ_PY(mx.operator.CustomOp):
 
 
     def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
+        if self.is_weight:
+            self.assign(in_grad[0], req[0], out_grad[0])
+            return
         data = in_data[0]
         alpha = aux[0]
         o_grad = out_grad[0]
@@ -170,3 +173,43 @@ class GDRQ_PYProp(mx.operator.CustomOpProp):
     def create_operator(self, ctx, shapes, dtypes):
         return GDRQ_PY(self.nbits, self.group_size, self.is_weight, self.lamda)
 
+class CLIP_RELU_PY(mx.operator.CustomOp):
+    def __init__(self, nbits, threshold):
+        self.nbits = nbits
+        self.threshold = threshold
+        self.QUANT_LEVEL = 2**(self.nbits) -1
+        self.count=0
+
+
+    def forward(self, is_train, req, in_data, out_data, aux):
+        data = in_data[0]
+        clipped_data = mx.nd.clip(data, 0, self.threshold)
+        quant_unit = self.threshold / self.QUANT_LEVEL
+        self.assign(out_data[0], req[0], mx.nd.round(clipped_data / quant_unit) * quant_unit)
+
+    def backward(self, req, out_grad, in_data, out_data, in_grad, aux):
+        clipped_flag = in_data[0] < self.threshold
+        self.assign(in_grad[0], req[0], out_grad[0] * clipped_flag)
+
+@mx.operator.register("CLIP_RELU_PY")
+class CLIP_RELU_PYProp(mx.operator.CustomOpProp):
+    def __init__(self, nbits="8", threshold="8.0"):
+        self.nbits = eval(nbits)
+        self.threshold = eval(threshold)
+        super(CLIP_RELU_PYProp, self).__init__(True)
+    def list_arguments(self):
+        return ['data']
+    def list_outputs(self):
+        return ['output']
+    def list_auxiliary_states(self):
+        return []
+    def infer_shape(self, in_shape):
+        shape = in_shape[0]
+        return [shape], [shape], []
+    def infer_type(self, in_type):
+        dtype = in_type[0]
+        return [dtype] * len(in_type), [in_type[0]]*len(self.list_outputs()), \
+            [in_type[0]]*len(self.list_auxiliary_states())
+
+    def create_operator(self, ctx, shapes, dtypes):
+        return CLIP_RELU_PY(self.nbits, self.threshold)

@@ -4,11 +4,11 @@ config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 # config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
-config.gpu_list = [7]
+config.gpu_list = [0]
 config.platform = "aliyun"
-config.dataset = "cifar100" # imagenet , cifar10 , cifar100 
-config.network = "resnet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
-config.depth = 18
+config.dataset = "cifar10" # imagenet , cifar10 , cifar100 
+config.network = "resnet_cifar10" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
+config.depth = 20
 # if config.dataset == "imagenet":
 #     config.depth = 18
 # elif config.dataset == "cifar10" :
@@ -20,7 +20,7 @@ config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
 # "experiments/1017_resnet20_cifar10/resnet20_cifar10"   
 # "experiments/1017_cifar10_sym50_cifar10_QIL/cifar10_sym50_cifar10"
 # "model/1011_resnet18_imagenet_fp32/1011_resnet18_imagenet"  
-config.model_load_prefix =  "experiments/1026_resnet_imagenet18_imagenet/resnet_imagenet18_imagenet"  
+config.model_load_prefix =  "experiments/1028_resnet18_resnet18_cifar100/resnet18_cifar100"  
 config.retrain = False
 config.allow_missing = True
 # config.use_global_stats=False
@@ -43,7 +43,7 @@ else:
         config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar10"
     elif config.dataset == "cifar100":
         config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar100"
-config.batch_per_gpu = 256
+config.batch_per_gpu = 128
 config.batch_size = config.batch_per_gpu * len(config.gpu_list)
 config.kv_store = 'local'
 
@@ -63,7 +63,7 @@ if config.dataset == "imagenet":
     config.lr_step = [30, 60, 85, 95]
     config.num_epoch = 110
 elif config.dataset == "cifar10":
-    config.lr_step = [60, 120, 160]
+    config.lr_step = [60, 120]
     config.num_epoch = 200
 elif config.dataset == "cifar100":
     config.lr_step = [30, 60, 90]
@@ -186,10 +186,10 @@ QIL_quant_attrs = {
 
 PACT_quant_attrs = { 
     "weight_quant_attrs": {
-        "nbits": "3"
+        "nbits": "2"
     }, 
     "act_quant_attrs": {
-        "nbits": "3",
+        "nbits": "2",
         "lamda": "0.01"
     }
 }
@@ -207,13 +207,17 @@ GDRQ_quant_attrs = {
         "nbits": "2",
         "group_size": "-1",
         "is_weight": "True",
-        "lamda": "0.99"
+        "lamda": "0.01"
     }, 
+    # "act_quant_attrs": {
+    #     "nbits": "2",
+    #     "group_size": "-1",
+    #     "is_weight": "False",
+    #     "lamda": "0.01"
+    # }
     "act_quant_attrs": {
-        "nbits": "4",
-        "group_size": "-1",
-        "is_weight": "False",
-        "lamda": "0.99"
+        "nbits": "2",
+        "threshold": "8.0"
     }
 }
 
@@ -228,7 +232,7 @@ quantize_attrs = {"Quantization_int8" : quantization_int8_quant_attrs,
 
 
 # for quantize int8 training
-config.quantize_flag = False
+config.quantize_flag = True
 config.quantize_op_name = "GDRQ"  # "Quantization_int8"  # "QIL" # "QIL_V2" "WNQ" "GDRQ"
 config.quant_attrs = quantize_attrs[config.quantize_op_name]
 
@@ -236,11 +240,11 @@ config.quant_attrs = quantize_attrs[config.quantize_op_name]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
 config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
 config.fix_bn = False
-config.output_dir = "1028_resnet18_" + config.model_prefix
-# config.output_dir = "1028_finetune_3bits_" + config.model_prefix + "_" + config.quantize_op_name
-# config.output_dir = "test"
+# config.output_dir = "1028_resnet18_" + config.model_prefix
+# config.output_dir = "{}/1029_2bits_{}".format(config.quantize_op_name, config.model_prefix)
+config.output_dir = "test"
 
 if config.quantize_flag and config.retrain:
     config.lr *= 0.1
-    config.lr_step = [120, 150, 180]
-    config.num_epoch = 200
+    config.lr_step = [120, 140]
+    config.num_epoch = 150
