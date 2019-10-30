@@ -59,22 +59,27 @@ def WNQ_quant_attrs(nbits): return {
     "act_quant_attrs": { }
 }
 
+# batch size =256, 50 epoch -> 250250
+# batch size =128, 50 epoch -> 500500
+
 def GDRQ_quant_attrs(nbits): return { 
     "weight_quant_attrs": {
         "nbits": str(nbits),
         "group_size": "-1",
         "is_weight": "True",
-        "lamda": "0.01"
+        "lamda": "0.001",
+        "delay_quant": "250250",
+        "fix_alpha": "False",
+        "ktimes": "3"
     }, 
-    # "act_quant_attrs": {
-    #     "nbits": "2",
-    #     "group_size": "-1",
-    #     "is_weight": "False",
-    #     "lamda": "0.01"
-    # }
     "act_quant_attrs": {
         "nbits": str(nbits),
-        "threshold": "8.0"
+        "group_size": "-1",
+        "is_weight": "False",
+        "lamda": "0.001",
+        "delay_quant": "250250",
+        "fix_alpha": "False",
+        "ktimes": "3"
     }
 }
 
@@ -85,9 +90,10 @@ quantize_attrs = {"Quantization_int8" : quantization_int8_quant_attrs,
                   "QIL_V3": QIL_quant_attrs,
                   "PACT": PACT_quant_attrs,
                   "WNQ": WNQ_quant_attrs,
-                  "GDRQ": GDRQ_quant_attrs}
+                  "GDRQ": GDRQ_quant_attrs,
+                  "GDRQ_CXX": GDRQ_quant_attrs}
 
 def get_quantize_attrs(quantize_alg, nbits):
-    assert quantize_alg in ("Quantization_int8", "QIL", "QIL_V2", "QIL_V3", "PACT", "WNQ", "GDRQ"), "{} not suported".format(quantize_alg)
+    assert quantize_alg in ("Quantization_int8", "QIL", "QIL_V2", "QIL_V3", "PACT", "WNQ", "GDRQ", "GDRQ_CXX"), "{} not suported".format(quantize_alg)
     attrs = quantize_attrs[quantize_alg](nbits)
     return attrs

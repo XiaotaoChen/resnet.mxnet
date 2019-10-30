@@ -48,13 +48,17 @@ def simulate_GDRQ(data, nbits, group_size, is_weight):
     return quanted_data
 
 class GDRQ_PY(mx.operator.CustomOp):
-    def __init__(self, nbits, group_size, is_weight, lamda):
+    def __init__(self, nbits, group_size, is_weight, lamda, delay_quant, fix_alpha, ktimes):
         self.nbits = nbits
         self.group_size = group_size
         self.is_weight = is_weight
         self.lamda = lamda
+        self.delay_quant = delay_quant
         self.QUANT_LEVEL = 2**(self.nbits) - 1
-        
+        self.fix_alpha = fix_alpha
+        self.ktimes = ktimes
+        # print("nbits:{}, group_size:{}, is_weight:{}, lamda:{}, delay_quant:{}".format(self.nbits, self.group_size, 
+        #        self.is_weight, self.lamda, self.delay_quant))
 
         # assert self.is_weight_perchannel == False, "currently GDRQ only support per tensor quantization"
     def forward(self, is_train, req, in_data, out_data, aux):
@@ -63,18 +67,24 @@ class GDRQ_PY(mx.operator.CustomOp):
         data_abs = mx.nd.abs(data)
 
         if self.group_size == -1:
-            mean = mx.nd.mean(data_abs)
-            threshold = 3 * mean
-            if self.is_weight:
-                alpha[:] = threshold
-            else:
-                alpha[:] = alpha + self.lamda * (alpha - threshold)
-
-            quant_unit = alpha / self.QUANT_LEVEL
+            if self.fix_alpha is False:
+                mean = mx.nd.mean(data_abs)
+                threshold = self.ktimes * mean
+                if self.is_weight:
+                    alpha[:] = threshold
+                else:
+                    alpha[:] = alpha + self.lamda * (alpha - threshold)
+                    # alpha[:] = 1
             scalar_t = alpha.asnumpy()[0]
             clipped_data = mx.nd.clip(data, - scalar_t, scalar_t)
-            quanted_data = mx.nd.round(clipped_data / quant_unit) * quant_unit
-            self.assign(out_data[0], req[0], quanted_data)
+            
+            if self.delay_quant > 0:
+                self.delay_quant -= 1
+            else:
+                quant_unit = alpha / self.QUANT_LEVEL
+                clipped_data = mx.nd.round(clipped_data / quant_unit) * quant_unit
+            self.assign(out_data[0], req[0], clipped_data)
+
         else:
             if self.is_weight is False:
                 data = mx.nd.swapaxes(data, 0, 1)  # for activation the channels in shape[1]
@@ -84,25 +94,28 @@ class GDRQ_PY(mx.operator.CustomOp):
             reshaped_data = mx.nd.reshape(data, shape=reshaped_shape)
             reshaped_data_abs = mx.nd.abs(reshaped_data)
             reshaped_data_sign = mx.nd.sign(reshaped_data)
-
-            axises = tuple([i for i in range(len(reshaped_shape))])
-            mean = mx.nd.mean(reshaped_data_abs, axis=axises[1:])
-            threshold = 3 * mean
-            if self.is_weight:
-                alpha[:] = threshold
-            else:
-                alpha[:] = alpha + self.lamda * (alpha - threshold)
+            if self.fix_alpha is False:
+                axises = tuple([i for i in range(len(reshaped_shape))])
+                mean = mx.nd.mean(reshaped_data_abs, axis=axises[1:])
+                threshold = self.ktimes * mean
+                if self.is_weight:
+                    alpha[:] = threshold
+                else:
+                    alpha[:] = alpha + self.lamda * (alpha - threshold)
 
             target_shape = alpha.shape + (1,) * len(reshaped_shape[1:])
             reshaped_alpha = mx.nd.reshape(alpha, shape=target_shape)
 
-            quant_unit = reshaped_alpha / self.QUANT_LEVEL
             clipped_data = mx.nd.where(reshaped_data_abs <= reshaped_alpha, reshaped_data, reshaped_alpha * reshaped_data_sign)
-            quanted_data = mx.nd.round(clipped_data / quant_unit) * quant_unit
-            quanted_data = mx.nd.reshape(quanted_data, shape=shape)
+            if self.delay_quant > 0:
+                self.delay_quant -= 1
+            else:
+                quant_unit = reshaped_alpha / self.QUANT_LEVEL
+                clipped_data = mx.nd.round(clipped_data / quant_unit) * quant_unit
+            clipped_data = mx.nd.reshape(clipped_data, shape=shape)
             if self.is_weight is False:
-                quanted_data = mx.nd.swapaxes(quanted_data, 0, 1)
-            self.assign(out_data[0], req[0], quanted_data)
+                clipped_data = mx.nd.swapaxes(clipped_data, 0, 1)
+            self.assign(out_data[0], req[0], clipped_data)
         
         # sim_quanted_data = simulate_GDRQ(in_data[0].asnumpy(), self.nbits, self.group_size, self.is_weight)
         # print_info(out_data[0].asnumpy(), sim_quanted_data)
@@ -140,11 +153,14 @@ class GDRQ_PY(mx.operator.CustomOp):
         
 @mx.operator.register("GDRQ_PY")
 class GDRQ_PYProp(mx.operator.CustomOpProp):
-    def __init__(self, nbits=4, group_size=-1, is_weight=False,  lamda=0.99):
+    def __init__(self, nbits=4, group_size=-1, is_weight=False,  lamda=0.001, delay_quant=0, fix_alpha=False, ktimes=3):
         self.nbits = int(nbits)
         self.group_size = int(group_size)
         self.is_weight = eval(is_weight)
         self.lamda = float(lamda)
+        self.delay_quant = int(delay_quant)
+        self.fix_alpha = eval(fix_alpha)
+        self.ktimes = float(ktimes)
         super(GDRQ_PYProp, self).__init__(True)
     def list_arguments(self):
         return ['data']
@@ -171,7 +187,7 @@ class GDRQ_PYProp(mx.operator.CustomOpProp):
             [in_type[0]]*len(self.list_auxiliary_states())
 
     def create_operator(self, ctx, shapes, dtypes):
-        return GDRQ_PY(self.nbits, self.group_size, self.is_weight, self.lamda)
+        return GDRQ_PY(self.nbits, self.group_size, self.is_weight, self.lamda, self.delay_quant, self.fix_alpha, self.ktimes)
 
 class CLIP_RELU_PY(mx.operator.CustomOp):
     def __init__(self, nbits, threshold):
