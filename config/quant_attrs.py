@@ -90,11 +90,12 @@ quantize_attrs = {"Quantization_int8" : quantization_int8_quant_attrs,
                   "QIL_V2": QIL_quant_attrs,
                   "QIL_V3": QIL_quant_attrs,
                   "PACT": PACT_quant_attrs,
+                  "PACT_CXX": PACT_quant_attrs,
                   "WNQ": WNQ_quant_attrs,
                   "GDRQ": GDRQ_quant_attrs,
                   "GDRQ_CXX": GDRQ_quant_attrs}
 
 def get_quantize_attrs(quantize_alg, nbits):
-    assert quantize_alg in ("Quantization_int8", "QIL", "QIL_V2", "QIL_V3", "PACT", "WNQ", "GDRQ", "GDRQ_CXX"), "{} not suported".format(quantize_alg)
+    assert quantize_alg in ("Quantization_int8", "QIL", "QIL_V2", "QIL_V3", "PACT", "PACT_CXX", "WNQ", "GDRQ", "GDRQ_CXX"), "{} not suported".format(quantize_alg)
     attrs = quantize_attrs[quantize_alg](nbits)
     return attrs

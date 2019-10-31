@@ -3,12 +3,12 @@ from easydict import EasyDict as edict
 config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
-config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
-# config.gpu_list = [4, 5, 6, 7]
+# config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
+config.gpu_list = [0, 1, 2, 3]
 config.platform = "aliyun"
 config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
-config.network = "resnet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
-config.depth = 50
+config.network = "preact_resnet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
+config.depth = 18
 # if config.dataset == "imagenet":
 #     config.depth = 18
 # elif config.dataset == "cifar10" :
@@ -45,7 +45,7 @@ else:
         config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar10"
     elif config.dataset == "cifar100":
         config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar100"
-config.batch_per_gpu = 64
+config.batch_per_gpu = 128
 config.batch_size = config.batch_per_gpu * len(config.gpu_list)
 config.kv_store = 'local'
 
@@ -62,8 +62,8 @@ config.multi_precision = True
 if config.dataset == "imagenet":
     # config.lr_step = [30, 60, 90]
     # config.num_epoch = 100
-    # config.lr_step = [30, 60, 85, 95]   # PACT
-    config.lr_step = [30, 70, 90]
+    config.lr_step = [30, 60, 85, 95]   # PACT
+    # config.lr_step = [30, 70, 90]
     config.num_epoch = 110
 elif config.dataset == "cifar10":
     config.lr_step = [60, 120]
@@ -150,19 +150,19 @@ else:
 
 # for quantize int8 training
 config.quantize_flag = True
-config.quantize_op_name = "GDRQ_CXX"  # "Quantization_int8"  # "QIL" # "QIL_V2" "WNQ" "PACT" "GDRQ" "GDRQ_CXX"
+config.quantize_op_name = "PACT_CXX"  # "Quantization_int8"  # "QIL" # "QIL_V2" "WNQ" "PACT" "GDRQ" "GDRQ_CXX" "PACT_CXX"
 config.nbits = 4
 from .quant_attrs import get_quantize_attrs
 config.quant_attrs = get_quantize_attrs(config.quantize_op_name, config.nbits)
 
 # config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
-config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 0}
+config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
 config.fix_bn = False
 # config.output_dir = "1028_resnet18_" + config.model_prefix
-config.output_dir = "{}/1031_{}bits_{}_bs{}_w3_act4".format(config.quantize_op_name, config.nbits, config.model_prefix, 
-                                                           config.batch_per_gpu * len(config.gpu_list))
-# config.output_dir = "test"
+# config.output_dir = "{}/1031_{}bits_{}_bs{}_w3_act4".format(config.quantize_op_name, config.nbits, config.model_prefix, 
+#                                                            config.batch_per_gpu * len(config.gpu_list))
+config.output_dir = "test"
 
 if config.quantize_flag and config.retrain:
     config.lr *= 0.1

@@ -207,6 +207,12 @@ def create_quant_node(quantize_op_name, var, attrs):
             # return var
             gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(8.0))
             quanted_node = mx.sym.Custom(data=var, gamma=gamma_var, **attrs, name=var.name, op_type="PACT_PY")
+    elif quantize_op_name == "PACT_CXX":
+        if "weight" in var.name:
+            quanted_node = mx.sym.contrib.DoReFa(name=var.name, data=var, **attrs)
+        else:
+            gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(8.0))
+            quanted_node = mx.sym.contrib.PACT(name=var.name, data=var, gamma=gamma_var, **attrs)
     elif quantize_op_name == "WNQ":
         if "weight" in var.name:
             quanted_node = mx.sym.Custom(data=var, **attrs, name=var.name, op_type="WNQ_PY")
@@ -226,7 +232,7 @@ def create_quant_node(quantize_op_name, var, attrs):
             alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(0.5), dtype="float32")
         else:
             alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(10.0), dtype="float32")
-        quanted_node = mx.sym.contrib.GDRQ(data=var, alpha=alpha_var, **attrs, name=var.name);
+        quanted_node = mx.sym.contrib.GDRQ(data=var, alpha=alpha_var, **attrs, name=var.name)
 
     return quanted_node
 
@@ -240,7 +246,7 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, weight_quant_
     assert symbol is not None
     assert weight_quant_attrs is not None
     assert act_quant_attrs is not None
-    assert quantize_op_name in ("Quantization_int8", "QIL", "QIL_V2", "QIL_V3", "PACT", "WNQ", "GDRQ", "GDRQ_CXX")
+    assert quantize_op_name in ("Quantization_int8", "QIL", "QIL_V2", "QIL_V3", "PACT", "PACT_CXX", "WNQ", "GDRQ", "GDRQ_CXX")
 
     jgraph = json.loads(symbol.tojson())
     jnodes = jgraph["nodes"]
