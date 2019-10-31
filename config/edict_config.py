@@ -3,8 +3,8 @@ from easydict import EasyDict as edict
 config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
-# config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
-config.gpu_list = [0, 1, 2, 3]
+config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
+# config.gpu_list = [4, 5, 6, 7]
 config.platform = "aliyun"
 config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
 config.network = "resnet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
@@ -149,20 +149,20 @@ else:
 
 
 # for quantize int8 training
-config.quantize_flag = False
-config.quantize_op_name = "GDRQ_CXX"  # "Quantization_int8"  # "QIL" # "QIL_V2" "WNQ" "GDRQ" "GDRQ_CXX"
+config.quantize_flag = True
+config.quantize_op_name = "GDRQ_CXX"  # "Quantization_int8"  # "QIL" # "QIL_V2" "WNQ" "PACT" "GDRQ" "GDRQ_CXX"
 config.nbits = 4
 from .quant_attrs import get_quantize_attrs
 config.quant_attrs = get_quantize_attrs(config.quantize_op_name, config.nbits)
 
 # config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
-config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
+config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 0}
 config.fix_bn = False
 # config.output_dir = "1028_resnet18_" + config.model_prefix
-# config.output_dir = "{}/1030_{}bits_{}_bs{}_cliprelu".format(config.quantize_op_name, config.nbits, config.model_prefix, 
-#                                                            config.batch_per_gpu * len(config.gpu_list))
-config.output_dir = "test"
+config.output_dir = "{}/1031_{}bits_{}_bs{}_w3_act4".format(config.quantize_op_name, config.nbits, config.model_prefix, 
+                                                           config.batch_per_gpu * len(config.gpu_list))
+# config.output_dir = "test"
 
 if config.quantize_flag and config.retrain:
     config.lr *= 0.1

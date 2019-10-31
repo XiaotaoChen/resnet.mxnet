@@ -59,6 +59,7 @@ def WNQ_quant_attrs(nbits): return {
     "act_quant_attrs": { }
 }
 
+# batch size =512, 50 epoch -> 125125
 # batch size =256, 50 epoch -> 250250
 # batch size =128, 50 epoch -> 500500
 
@@ -68,7 +69,7 @@ def GDRQ_quant_attrs(nbits): return {
         "group_size": "-1",
         "is_weight": "True",
         "lamda": "0.001",
-        "delay_quant": "250250",
+        "delay_quant": "125125",
         "fix_alpha": "False",
         "ktimes": "3"
     }, 
@@ -77,7 +78,7 @@ def GDRQ_quant_attrs(nbits): return {
         "group_size": "-1",
         "is_weight": "False",
         "lamda": "0.001",
-        "delay_quant": "250250",
+        "delay_quant": "125125",
         "fix_alpha": "False",
         "ktimes": "3"
     }

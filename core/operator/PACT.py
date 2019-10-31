@@ -65,7 +65,7 @@ class DoReFa_PY(mx.operator.CustomOp):
         # max_data = sign_flag * max_abs_data
 
         # '''
-        # the diff of tanh(x)/2amx(|tanh(x)|)
+        # the diff of tanh(x)/2max(|tanh(x)|)
         # 1/(2 * max_abs) if x!=max_abs;
         # -1/2 * sum(xi/max_abs**2), if x==max_abs and sign > 0
         # 1/2 * sum(xi/max_abs**2), if x==max_abs and sign < 0
