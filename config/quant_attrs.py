@@ -2,6 +2,37 @@
 -----------------------------------------
 example of quantize setting
 -----------------------------------------
+Quantization_int8
+==============================
+    "weight":{
+        "quantize_op_name": "Quantization_int8",
+        "init_value": 0,
+        "attrs": {
+            "nbits": "4",
+            "quant_mode": "minmax",
+            "is_weight": "True",
+            "is_weight_perchannel": "False",
+            "delay_quant": "0",
+            "ema_decay": "0.99",
+            "grad_mode": "ste",
+            "fix_act_scale": "False"
+        }
+    },
+    "act":{
+        "quantize_op_name": "Quantization_int8",
+        "init_value": 0,
+        "attrs": {
+            "nbits": "4",
+            "quant_mode": "minmax",
+            "is_weight": "False",
+            "is_weight_perchannel": "False",
+            "delay_quant": "0",
+            "ema_decay": "0.99",
+            "grad_mode": "ste",
+            "fix_act_scale": "False"
+        }
+    }
+
 GDRQ
 ==============================
     "weight":{
