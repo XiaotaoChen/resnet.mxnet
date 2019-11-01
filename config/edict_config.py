@@ -4,25 +4,25 @@ config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 # config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
-config.gpu_list = [0, 1, 2, 3]
+config.gpu_list = [2]
 config.platform = "aliyun"
-config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
-config.network = "preact_resnet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
-config.depth = 18
+config.dataset = "cifar10" # imagenet , cifar10 , cifar100 
+config.network = "resnet_cifar10" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
+config.depth = 20
 # if config.dataset == "imagenet":
 #     config.depth = 18
 # elif config.dataset == "cifar10" :
 #     config.depth = 50
 # elif config.dataset == "cifar100":
 #     config.depth = 18
-config.model_load_epoch =100
+config.model_load_epoch =30
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
 # "experiments/1017_resnet20_cifar10/resnet20_cifar10"
-# "experiments/1017_cifar10_sym50_cifar10_QIL/cifar10_sym50_cifar10"
 # "model/1011_resnet18_imagenet_fp32/1011_resnet18_imagenet"
 # "experiments/1026_resnet_imagenet18_imagenet/resnet_imagenet18_imagenet"
 # "model/resnet50_new/resnet_imagenet"
-config.model_load_prefix = "model/resnet50_new/resnet_imagenet"
+# "experiments/GDRQ_CXX/1031_4bits_resnet50_imagenet_bs512/resnet50_imagenet"
+config.model_load_prefix = "experiments/GDRQ_CXX/1031_4bits_resnet50_imagenet_bs512/resnet50_imagenet"
 config.retrain = False
 config.allow_missing = True
 # config.use_global_stats=False
@@ -62,8 +62,8 @@ config.multi_precision = True
 if config.dataset == "imagenet":
     # config.lr_step = [30, 60, 90]
     # config.num_epoch = 100
-    config.lr_step = [30, 60, 85, 95]   # PACT
-    # config.lr_step = [30, 70, 90]
+    # config.lr_step = [30, 60, 85, 95]   # PACT
+    config.lr_step = [30, 70, 90]
     config.num_epoch = 110
 elif config.dataset == "cifar10":
     config.lr_step = [60, 120]
@@ -150,21 +150,38 @@ else:
 
 # for quantize int8 training
 config.quantize_flag = True
-config.quantize_op_name = "PACT_CXX"  # "Quantization_int8"  # "QIL" # "QIL_V2" "WNQ" "PACT" "GDRQ" "GDRQ_CXX" "PACT_CXX"
-config.nbits = 4
-from .quant_attrs import get_quantize_attrs
-config.quant_attrs = get_quantize_attrs(config.quantize_op_name, config.nbits)
+
+# for GDRQ
+# batch size =512, 50 epoch -> 125125
+# batch size =256, 50 epoch -> 250250
+# batch size =128, 50 epoch -> 500500
+config.quantize_setting = {
+    "weight":{
+        "quantize_op_name": "DoReFa_CXX",
+        "attrs": {
+            "nbits": "4"
+        }
+    },
+    "act":{
+        "quantize_op_name": "PACT_CXX",
+        "init_value": 8.0,
+        "attrs": {
+            "nbits": "4"
+        }
+    }
+
+}
 
 # config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
 config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
 config.fix_bn = False
 # config.output_dir = "1028_resnet18_" + config.model_prefix
-# config.output_dir = "{}/1031_{}bits_{}_bs{}_w3_act4".format(config.quantize_op_name, config.nbits, config.model_prefix, 
+# config.output_dir = "{}/1101_{}bits_{}_bs{}_w3_act4".format(config.quantize_op_name, config.nbits, config.model_prefix, 
 #                                                            config.batch_per_gpu * len(config.gpu_list))
-config.output_dir = "test"
+config.output_dir = "test2"
 
-if config.quantize_flag and config.retrain:
-    config.lr *= 0.1
-    config.lr_step = [120, 140]
-    config.num_epoch = 150
+# if config.quantize_flag and config.retrain:
+#     config.lr *= 0.1
+#     config.lr_step = [120, 140]
+#     config.num_epoch = 150

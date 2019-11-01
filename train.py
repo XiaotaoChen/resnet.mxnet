@@ -115,8 +115,8 @@ def main(config):
         worker_data_shape = dict(data_shapes + label_shapes)
         _, out_shape, _ = symbol.get_internals().infer_shape(**worker_data_shape)
         out_shape_dictoinary = dict(zip(symbol.get_internals().list_outputs(), out_shape))
-        symbol = attach_quantize_node(symbol, out_shape_dictoinary, config.quantize_op_name, 
-                                      config.quant_attrs["weight_quant_attrs"], config.quant_attrs["act_quant_attrs"], 
+        symbol = attach_quantize_node(symbol, out_shape_dictoinary, 
+                                      config.quantize_setting["weight"], config.quantize_setting["act"], 
                                       config.quantized_op, config.skip_quantize_counts)
         # symbol.save("attach_quant.json")
         # raise NotImplementedError

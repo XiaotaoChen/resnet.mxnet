@@ -28,16 +28,6 @@ from .operator.GDRQ import *
 
 
 FLOAT32_DTYPE = 0
-INIT_ZERO = '[\"zero\", {}]'
-INIT_ONE = '[\"one\", {}]'
-INIT_HALF = '[\"constant\", {\"value\": 0.5}]'
-INIT_0_4 = '[\"constant\", {\"value\": 0.4}]'
-MINMAX_SUFFIX = "_minmax"
-QIL_PRUNING = "_pruning_point"
-QIL_CLIPPING = "_clipping_point"
-QIL_CENTER = "_center"
-QIL_DISTANCE = "_distance"
-QIL_GAMMA = "_gamma"
 
 def get_constant(value):
     init_str = '[\"constant\", {\"value\": ' + str(value) + '}]'
@@ -166,77 +156,47 @@ def fix_bn(symbol):
     outputs = outputs[0] if len(outputs) == 1 else mx.sym.Group(outputs)
     return outputs
 
-def create_quant_node(quantize_op_name, var, attrs):
-    if quantize_op_name == "Quantization_int8":
-        minmax_var = mx.sym.var(name = var.name + MINMAX_SUFFIX, init=INIT_ZERO)
-        quanted_node = mx.sym.contrib.Quantization_int8(data=var, minmax=minmax_var, **attrs, name=var.name)
-    elif quantize_op_name == "QIL":
-        pruning_var = mx.sym.var(name = var.name + QIL_PRUNING, init=get_constant(0), lr_mult=0.01, wd_mult=0)
-        clipping_var = mx.sym.var(name = var.name + QIL_CLIPPING, init=get_constant(1), lr_mult=0.01, wd_mult=0)
-        gamma_var = mx.sym.var(name = var.name + QIL_GAMMA, init=INIT_ONE)
-        quanted_node = mx.sym.Custom(data=var, pruning_point=pruning_var,
-                                     clipping_point=clipping_var,
-                                     gamma=gamma_var, **attrs, name=var.name, op_type='QIL_PY')
-    elif quantize_op_name == "QIL_V2":
-        center_var = mx.sym.var(name = var.name + QIL_CENTER, init=INIT_HALF, lr_mult=0.01, wd_mult=0)
-        distance_var = mx.sym.var(name = var.name + QIL_DISTANCE, init=INIT_0_4, lr_mult=0.01, wd_mult=0)
-        gamma_var = mx.sym.var(name = var.name + QIL_GAMMA, init=INIT_ONE)
-        quanted_node = mx.sym.Custom(data=var, center=center_var,
-                                     distance=distance_var, gamma=gamma_var, 
-                                     **attrs, name=var.name, op_type='QIL_V2_PY')
-    elif quantize_op_name == "QIL_V3":
-        ep_var = mx.sym.var(name = var.name + "_ep", init=get_constant(-5), lr_mult=0.01, wd_mult=0)
-        if "weight" in var.name:
-            ed_var = mx.sym.var(name = var.name + "_ed", init=get_constant(0), lr_mult=0.01, wd_mult=0)
-        else:
-            ed_var = mx.sym.var(name = var.name + "_ed", init=get_constant(2), lr_mult=0.01, wd_mult=0)
-        gamma_var = mx.sym.var(name = var.name + QIL_GAMMA, init=INIT_ONE)
-        quanted_node = mx.sym.Custom(data=var, ep=ep_var,
-                                     ed=ed_var,
-                                     gamma=gamma_var, **attrs, name=var.name, op_type='QIL_V3_PY')
-    elif quantize_op_name == "PACT":
-        if "weight" in var.name:
-            # DoReFa quantize
-            # return var
-            quanted_node = mx.sym.Custom(data=var, **attrs, name=var.name, op_type="DoReFa_PY")
-            # gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(0.5), wd_mult=float(attrs["lamda"]))
-            # quanted_node = mx.sym.Custom(data=var, gamma=gamma_var, **attrs, name=var.name, op_type="PACT_V2_PY")
-            # quanted_node = mx.sym.Custom(data=var, **attrs, name=var.name, op_type="QUANT_STE_PY")
-        else:
-            # PACT_ACT
-            # return var
-            gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(8.0))
-            quanted_node = mx.sym.Custom(data=var, gamma=gamma_var, **attrs, name=var.name, op_type="PACT_PY")
-    elif quantize_op_name == "PACT_CXX":
-        if "weight" in var.name:
-            quanted_node = mx.sym.contrib.DoReFa(name=var.name, data=var, **attrs)
-        else:
-            gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(8.0))
-            quanted_node = mx.sym.contrib.PACT(name=var.name, data=var, gamma=gamma_var, **attrs)
-    elif quantize_op_name == "WNQ":
-        if "weight" in var.name:
-            quanted_node = mx.sym.Custom(data=var, **attrs, name=var.name, op_type="WNQ_PY")
-        else:
-            return var
-    elif quantize_op_name == "GDRQ":
-        if "weight" in var.name:
-            alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(0.5), dtype="float32")
-            quanted_node = mx.sym.Custom(data=var, alpha=alpha_var, **attrs, name=var.name, op_type="GDRQ_PY")
-        else:
-            # quanted_node = var
-            alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(10.0), dtype="float32")
-            quanted_node = mx.sym.Custom(data=var, alpha=alpha_var, **attrs, name=var.name, op_type="GDRQ_PY")
-            # quanted_node = mx.sym.Custom(data=var, **attrs, name=var.name, op_type="CLIP_RELU_PY")
-    elif quantize_op_name == "GDRQ_CXX":
-        if "weight" in var.name:
-            alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(0.5), dtype="float32")
-        else:
-            alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(10.0), dtype="float32")
-        quanted_node = mx.sym.contrib.GDRQ(data=var, alpha=alpha_var, **attrs, name=var.name)
+def create_quant_node(var, setting):
+    quantize_op_name = setting.quantize_op_name
+    attrs = setting.attrs
+    assert quantize_op_name in ("Quantization_int8", "QIL", "DoReFa_PY", "DoReFa_CXX", "PACT", "PACT_CXX", 
+                                "WNQ", "GDRQ", "GDRQ_CXX")
 
+    if quantize_op_name == "Quantization_int8":
+        init_value = setting.init_value or 0
+        minmax_var = mx.sym.var(name = var.name + "_minmax", init=mx.init.Constant(init_value))
+        quanted_node = mx.sym.contrib.Quantization_int8(name=var.name, data=var, minmax=minmax_var, **attrs)
+    elif quantize_op_name == "QIL":
+        init_value = setting.init_value or 1.0
+        pruning_var = mx.sym.var(name = var.name + "_pruning_point", init=get_constant(0), lr_mult=0.01, wd_mult=0)
+        clipping_var = mx.sym.var(name = var.name + "_clipping_point", init=get_constant(init_value), lr_mult=0.01, wd_mult=0)
+        gamma_var = mx.sym.var(name = var.name + "_gamma", init=mx.init.Constant(1.0))
+        quanted_node = mx.sym.Custom(name=var.name, data=var, pruning_point=pruning_var, clipping_point=clipping_var,
+                                     gamma=gamma_var, **attrs, op_type='QIL_PY')
+    elif quantize_op_name == "DoReFa_PY":
+        quanted_node = mx.sym.Custom(name=var.name, data=var, **attrs, op_type="DoReFa_PY")
+    elif quantize_op_name == "DoReFa_CXX":
+        quanted_node = mx.sym.contrib.DoReFa(name=var.name, data=var, **attrs)
+    elif quantize_op_name == "PACT":
+        init_value = setting.init_value or 8.0
+        gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(init_value))
+        quanted_node = mx.sym.Custom(name=var.name, data=var, gamma=gamma_var, **attrs, op_type="PACT_PY")
+    elif quantize_op_name == "PACT_CXX":
+        init_value = setting.init_value or 8.0
+        gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(init_value))
+        quanted_node = mx.sym.contrib.PACT(name=var.name, data=var, gamma=gamma_var, **attrs)
+    elif quantize_op_name == "GDRQ":
+        init_value = setting.init_value or 1.0
+        alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(init_value), dtype="float32")
+        quanted_node = mx.sym.Custom(name=var.name, data=var, alpha=alpha_var, **attrs, op_type="GDRQ_PY")
+    elif quantize_op_name == "GDRQ_CXX":
+        init_value = setting.init_value or 1.0
+        alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(init_value), dtype="float32")
+        quanted_node = mx.sym.contrib.GDRQ(name=var.name, data=var, alpha=alpha_var, **attrs)
+    
     return quanted_node
 
-def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, weight_quant_attrs, act_quant_attrs, 
+def attach_quantize_node(symbol, out_shape_dict, weight_setting, act_setting, 
                          quantized_op=("Convolution", "FullyConnected", "Deconvolution"), skip_quantize_counts=None):
     """
     Adapted from https://github.com/dmlc/tvm/blob/master/python/tvm/relay/frontend/mxnet.py
@@ -244,10 +204,8 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, weight_quant_
     it back to mxnet graph.
     """
     assert symbol is not None
-    assert weight_quant_attrs is not None
-    assert act_quant_attrs is not None
-    assert quantize_op_name in ("Quantization_int8", "QIL", "QIL_V2", "QIL_V3", "PACT", "PACT_CXX", "WNQ", "GDRQ", "GDRQ_CXX")
-
+    assert weight_setting is not None
+    assert act_setting is not None
     jgraph = json.loads(symbol.tojson())
     jnodes = jgraph["nodes"]
     node_map = {}
@@ -290,13 +248,13 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, weight_quant_
                     print("{} has attached quantized node".format(data_name))
                     data_quanted = quantized_node_map[data_name]
                 else:
-                    data_quanted = create_quant_node(quantize_op_name, datavar, act_quant_attrs)
+                    data_quanted = create_quant_node(datavar, act_setting)
                     quantized_node_map[data_name] = data_quanted
                 if weight_name in quantized_node_map.keys():
                     print("{} has attached quantized node".format(weight_name))
                     weight_quanted = quantized_node_map[weight_name]
                 else:
-                    weight_quanted = create_quant_node(quantize_op_name, weightvar, weight_quant_attrs)
+                    weight_quanted = create_quant_node(weightvar, weight_setting)
                     quantized_node_map[weight_name] = weight_quanted
                 print("attach quantize node for {} inputs:{}, {}".format(op_name, data_name, weight_name))
                 quanted_children = [data_quanted, weight_quanted, biasvar]
@@ -309,7 +267,7 @@ def attach_quantize_node(symbol, out_shape_dict, quantize_op_name, weight_quant_
                         print("{} has attached quantized node".format(var.name))
                         quanted_children[i] = quantized_node_map[var.name]
                     else:
-                        quanted_var = create_quant_node(quantize_op_name, var, act_quant_attrs)
+                        quanted_var = create_quant_node(var, act_setting)
                         quantized_node_map[var.name] = quanted_var
                         quanted_children[i] = quantized_node_map[var.name]
             
