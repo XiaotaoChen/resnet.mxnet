@@ -4,10 +4,10 @@ config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 # config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
-config.gpu_list = [0, 1, 2, 3]
+config.gpu_list = [4, 5, 6, 7]
 config.platform = "aliyun"
 config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
-config.network = "preact_resnet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
+config.network = "mobilenet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
 config.depth = 18
 # if config.dataset == "imagenet":
 #     config.depth = 18
@@ -15,15 +15,16 @@ config.depth = 18
 #     config.depth = 50
 # elif config.dataset == "cifar100":
 #     config.depth = 18
-config.model_load_epoch =30
+config.model_load_epoch =100
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
 # "experiments/1017_resnet20_cifar10/resnet20_cifar10"
 # "model/1011_resnet18_imagenet_fp32/1011_resnet18_imagenet"
 # "experiments/1026_resnet_imagenet18_imagenet/resnet_imagenet18_imagenet"
 # "model/resnet50_new/resnet_imagenet"
 # "experiments/GDRQ_CXX/1031_4bits_resnet50_imagenet_bs512/resnet50_imagenet"
-config.model_load_prefix = "experiments/GDRQ_CXX/1031_4bits_resnet50_imagenet_bs512/resnet50_imagenet"
-config.retrain = False
+# "model/mobilenet/mobilenet"
+config.model_load_prefix = "model/mobilenet/mobilenet"
+config.retrain = True
 config.allow_missing = True
 # config.use_global_stats=False
 # config.fix_gamma=True
@@ -60,11 +61,11 @@ else:
 config.momentum = 0.9
 config.multi_precision = True
 if config.dataset == "imagenet":
-    # config.lr_step = [30, 60, 90]
-    # config.num_epoch = 100
-    config.lr_step = [30, 60, 85, 95]   # PACT
+    config.lr_step = [30, 60, 90]
+    config.num_epoch = 120
+    # config.lr_step = [30, 60, 85, 95]   # PACT
     # config.lr_step = [30, 70, 90]
-    config.num_epoch = 110
+    # config.num_epoch = 110
 elif config.dataset == "cifar10":
     config.lr_step = [60, 120]
     config.num_epoch = 200
@@ -160,10 +161,10 @@ config.quantize_setting = {
         "quantize_op_name": "Quantization_int8",
         "init_value": 0,
         "attrs": {
-            "nbits": "3",
+            "nbits": "7",
             "quant_mode": "minmax",
             "is_weight": "True",
-            "is_weight_perchannel": "False",
+            "is_weight_perchannel": "True",
             "delay_quant": "0",
             "ema_decay": "0.99",
             "grad_mode": "ste",
@@ -174,7 +175,7 @@ config.quantize_setting = {
         "quantize_op_name": "Quantization_int8",
         "init_value": 0,
         "attrs": {
-            "nbits": "4",
+            "nbits": "7",
             "quant_mode": "minmax",
             "is_weight": "False",
             "is_weight_perchannel": "False",
@@ -186,12 +187,14 @@ config.quantize_setting = {
     }
 }
 
-# config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
-config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
-config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
+# config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", 
+#                        "elemwise_add", "Softmax", "SoftmaxOutput"]
+config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution", "Pooling"]
+config.skip_quantize_counts = {"Convolution": 0, "FullyConnected": 0}
 config.fix_bn = False
 # config.output_dir = "1028_resnet18_" + config.model_prefix
-config.output_dir = "{}/1101_{}_bs{}_w{}_act{}".format(config.quantize_setting["act"]["quantize_op_name"], 
+config.output_dir = "w_{}_act_{}/1107_{}_bs{}_w{}_act{}_pool_ft".format(config.quantize_setting["weight"]["quantize_op_name"], 
+                                             config.quantize_setting["act"]["quantize_op_name"], 
                                              config.model_prefix, config.batch_per_gpu * len(config.gpu_list),
                                              config.quantize_setting["weight"]["attrs"]["nbits"], 
                                              config.quantize_setting["act"]["attrs"]["nbits"])

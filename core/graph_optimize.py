@@ -25,6 +25,7 @@ from .operator.QIL_V3 import *
 from .operator.PACT import * # PACT_PY, DoReFa_PY
 from .operator.WNQ import *
 from .operator.GDRQ import *
+from .operator.quantization_int8 import *
 
 
 FLOAT32_DTYPE = 0
@@ -159,13 +160,17 @@ def fix_bn(symbol):
 def create_quant_node(var, setting):
     quantize_op_name = setting.quantize_op_name
     attrs = setting.attrs
-    assert quantize_op_name in ("Quantization_int8", "QIL", "DoReFa_PY", "DoReFa_CXX", "PACT", "PACT_CXX", 
+    assert quantize_op_name in ("Quantization_int8", "Quantization_int8_PY", "QIL", "DoReFa_PY", "DoReFa_CXX", "PACT", "PACT_CXX", 
                                 "WNQ", "GDRQ", "GDRQ_CXX")
 
     if quantize_op_name == "Quantization_int8":
         init_value = setting.init_value or 0
         minmax_var = mx.sym.var(name = var.name + "_minmax", init=mx.init.Constant(init_value))
         quanted_node = mx.sym.contrib.Quantization_int8(name=var.name, data=var, minmax=minmax_var, **attrs)
+    elif quantize_op_name == "Quantization_int8_PY":
+        init_value = setting.init_value or 0
+        minmax_var = mx.sym.var(name = var.name + "_minmax", init=mx.init.Constant(init_value))
+        quanted_node = mx.sym.Custom(name=var.name, data=var, minmax=minmax_var, **attrs, op_type="Quantization_int8_PY")
     elif quantize_op_name == "QIL":
         init_value = setting.init_value or 1.0
         pruning_var = mx.sym.var(name = var.name + "_pruning_point", init=get_constant(0), lr_mult=0.01, wd_mult=0)
@@ -212,7 +217,8 @@ def attach_quantize_node(symbol, out_shape_dict, weight_setting, act_setting,
     node_op_map = {}
     quantized_node_map = {}
     visited_op_counts = {"Convolution": 0, "FullyConnected": 0, "Deconvolution": 0, 
-                          "Concat": 0, "Pooling": 0, "add_n": 0, "elemwise_add": 0}
+                          "Concat": 0, "Pooling": 0, "add_n": 0, "elemwise_add": 0,
+                          "Softmax": 0, "SoftmaxOutput": 0}
 
 
     for nid, node in enumerate(jnodes):
@@ -258,7 +264,7 @@ def attach_quantize_node(symbol, out_shape_dict, weight_setting, act_setting,
                     quantized_node_map[weight_name] = weight_quanted
                 print("attach quantize node for {} inputs:{}, {}".format(op_name, data_name, weight_name))
                 quanted_children = [data_quanted, weight_quanted, biasvar]
-            elif op_name in ("Concat", "Pooling", "add_n", "elemwise_add"):
+            elif op_name in ("Concat", "Pooling", "add_n", "elemwise_add", "Softmax", "SoftmaxOutput"):
                 quant_names = [var.name for var in children]
                 print("attach quantize node for {} inputs:{}".format(op_name, quant_names))
                 quanted_children = [None] * len(children)

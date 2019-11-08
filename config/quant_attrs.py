@@ -45,7 +45,8 @@ GDRQ
             "is_weight": "True",
             "lamda": "0.001",
             "delay_quant": "0",
-            "ktimes": "3"
+            "ktimes": "3",
+            "weight_grad_mode": "ste"
         }
     },
     "act":{
