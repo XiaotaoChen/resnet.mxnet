@@ -26,6 +26,9 @@ from .operator.PACT import * # PACT_PY, DoReFa_PY
 from .operator.WNQ import *
 from .operator.GDRQ import *
 from .operator.quantization_int8 import *
+from .operator.LSQ_PY import *
+from .operator.COLL_INFO_PY import *
+
 
 
 FLOAT32_DTYPE = 0
@@ -161,7 +164,7 @@ def create_quant_node(var, setting):
     quantize_op_name = setting.quantize_op_name
     attrs = setting.attrs
     assert quantize_op_name in ("Quantization_int8", "Quantization_int8_PY", "QIL", "DoReFa_PY", "DoReFa_CXX", "PACT", "PACT_CXX", 
-                                "WNQ", "GDRQ", "GDRQ_CXX")
+                                "WNQ", "GDRQ", "GDRQ_CXX", "LSQ_PY", "COLL_INFO_PY")
 
     if quantize_op_name == "Quantization_int8":
         init_value = setting.init_value or 0
@@ -198,7 +201,12 @@ def create_quant_node(var, setting):
         init_value = setting.init_value or 1.0
         alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(init_value), dtype="float32")
         quanted_node = mx.sym.contrib.GDRQ(name=var.name, data=var, alpha=alpha_var, **attrs)
-    
+    elif quantize_op_name == "LSQ_PY":
+        init_value = setting.init_value or 8.0
+        gamma_var = mx.sym.var(name = var.name + "_lsq_gamma", init=get_constant(init_value))
+        quanted_node = mx.sym.Custom(name=var.name, data=var, gamma=gamma_var, **attrs, op_type="LSQ_PY")
+    elif quantize_op_name == "COLL_INFO_PY":
+        quanted_node = mx.sym.Custom(name=var.name, data=var, **attrs, op_type="COLL_INFO_PY")
     return quanted_node
 
 def attach_quantize_node(symbol, out_shape_dict, weight_setting, act_setting, 

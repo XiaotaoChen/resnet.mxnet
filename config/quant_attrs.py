@@ -79,4 +79,41 @@ PACT
         }
     }
 
+
+LSQ
+==============================
+    "weight":{
+        "quantize_op_name": "LSQ_PY",
+        "init_value": 3.0,
+        "attrs": {
+            "nbits": "4",
+            "is_weight": "True",
+            "grad_factor": "False"
+        }
+    },
+    "act":{
+        "quantize_op_name": "LSQ_PY",
+        "init_value": 8.0,
+        "attrs": {
+            "nbits": "4",
+            "is_weight": "False",
+            "grad_factor": "False"
+        }
+    }
+
+COLL_INFO
+==============================
+    "weight":{
+        "quantize_op_name": "COLL_INFO_PY",
+        "attrs": {
+            "is_weight": "True"
+        }
+    },
+    "act":{
+        "quantize_op_name": "COLL_INFO_PY"
+        "attrs": {
+            "is_weight": "False"
+        }
+    }
+
 """

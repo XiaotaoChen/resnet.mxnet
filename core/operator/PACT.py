@@ -142,6 +142,7 @@ class PACT_PY(mx.operator.CustomOp):
         self.output.backward(out_grad[0])
         self.assign(in_grad[0], req[0], self.data.grad)
         self.assign(in_grad[1], req[1], self.gamma.grad)
+        print("gamma grad:{}".format(in_grad[1].asnumpy()[0]))
         
 @mx.operator.register("PACT_PY")
 class PACT_PYProp(mx.operator.CustomOpProp):
