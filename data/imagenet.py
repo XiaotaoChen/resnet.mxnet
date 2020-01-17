@@ -1,6 +1,6 @@
 import os
 # import config
-from config.edict_config import config
+from config.example_config import config
 import mxnet as mx
 from mxnet.io import DataBatch, DataIter
 import numpy as np
@@ -144,7 +144,6 @@ class MultipleDataIter(DataIter):
 
 def imagenet_iterator(data_dir, batch_size, num_workers, rank, image_shape):
     num_examples = 1281167
-
     if config.benchmark is not None and config.benchmark == 1:
         data_shape = (batch_size,) + image_shape
         train = SyntheticDataIter(config.num_classes, data_shape, 5005, np.float32)
@@ -289,5 +288,5 @@ def get_data_rec(data_dir, batch_size, data_nthreads, num_workers, rank):
 def get_test_symbol_data(num_classes, batch_size, image_shape):
     num_examples = 1281167
     data_shape = (batch_size,) + image_shape
-    train = SyntheticDataIter(num_classes, data_shape, 2, np.float32)
+    train = SyntheticDataIter(num_classes, data_shape, 100, np.float32)
     return (train, None, num_examples)
