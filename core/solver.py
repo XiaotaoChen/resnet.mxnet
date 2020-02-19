@@ -158,6 +158,12 @@ class Solver(object):
             arg_params, aux_params = self.module.get_params()
             self.module.set_params(arg_params, aux_params)
 
+            import pickle
+            print("rank {}: dump params".format(rank))
+            pickle.dump(arg_params, open('outputs/rank{}_iter{}_arg.pkl'.format(rank, temp_count), 'wb'))
+            pickle.dump(aux_params, open('outputs/rank{}_iter{}_aux.pkl'.format(rank, temp_count), 'wb'))
+
+
             # if epoch_end_callback is not None and rank == 0:
             #     for callback in _as_list(epoch_end_callback):
             #         callback(epoch, self.symbol, arg_params, aux_params)
