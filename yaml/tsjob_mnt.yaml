@@ -1,0 +1,63 @@
+apiVersion: kubeflow.org/v1alpha2
+kind: MPIJob
+metadata:
+  name: tsjob
+spec:
+  slotsPerWorker: 6
+  cleanPodPolicy: Running
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+         spec:
+           containers:
+           - image: artifactory.tusimple.ai/docker-rnd/cxt/pipeline-base-lidar0108/cuda10.0-cudnn7:dist_example
+             name: tsjob
+             command:
+             - /root/3rdparty/openmpi4.0/bin/mpirun
+             - --allow-run-as-root
+             - -np
+             - "12"
+             - -bind-to
+             - none
+             - -map-by
+             - slot
+             - -x
+             - NCCL_DEBUG=INFO
+             - -x
+             - LD_LIBRARY_PATH
+             - -x
+             - PATH
+             - -x
+             - OMP_NUM_THREADS=1
+             - -mca
+             - pml
+             - ob1
+             - -mca
+             - btl
+             - ^openib
+             - bash
+             - ./scripts/train.sh
+             - resnet
+             - hvd
+             workingDir: /root/resnet.mxnet
+
+    Worker:
+      replicas: 2
+      template:
+        spec:
+          containers:
+          - image: artifactory.tusimple.ai/docker-rnd/cxt/pipeline-base-lidar0108/cuda10.0-cudnn7:dist_example
+            name: tsjob
+            resources:
+              limits:
+                nvidia.com/gpu: 6
+            volumeMounts:
+            - mountPath: /mnt
+              name: vol1
+
+          volumes:
+          - hostPath:
+              path: /mnt
+              type: ""
+            name: vol1

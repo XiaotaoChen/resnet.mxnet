@@ -1,0 +1,57 @@
+apiVersion: kubeflow.org/v1alpha2
+kind: MPIJob
+metadata:
+  name: mnist
+spec:
+  slotsPerWorker: 1
+  cleanPodPolicy: Running
+  mpiReplicaSpecs:
+    Launcher:
+      replicas: 1
+      template:
+        spec:
+          containers:
+            - image: 'artifactory.tusimple.ai/docker-rnd/cxt/k8s_mpi_mx:0217'
+              name: mnist
+              command:
+                - mpirun
+                - '-mca'
+                - btl_tcp_if_exclude
+                - lo
+                - '-mca'
+                - pml
+                - ob1
+                - '-mca'
+                - btl
+                - ^openib
+                - '--bind-to'
+                - none
+                - '-map-by'
+                - slot
+                - '-x'
+                - LD_LIBRARY_PATH
+                - '-x'
+                - PATH
+                - '-x'
+                - NCCL_SOCKET_IFNAME=eth0
+                - '-x'
+                - NCCL_DEBUG=INFO
+                - '-x'
+                - MXNET_CUDNN_AUTOTUNE_DEFAULT=0
+                - python
+                - /examples/mxnet_mnist.py
+                - '--batch-size'
+                - '64'
+                - '--epochs'
+                - '5'
+    Worker:
+      replicas: 2
+      template:
+        spec:
+          containers:
+            - image: 'artifactory.tusimple.ai/docker-rnd/cxt/k8s_mpi_mx:0217'
+              name: mnist
+              resources:
+                limits:
+                  nvidia.com/gpu: 4
+
