@@ -38,9 +38,9 @@ spec:
              - ^openib
              - bash
              - ./scripts/train.sh
-             - resnet
+             - test_symbol
              - hvd
-             workingDir: /root/resnet.mxnet
+             workingDir: /mnt/truenas/scratch/xiaotao.chen/Repositories/tmp/resnet.mxnet
 
     Worker:
       replicas: 2

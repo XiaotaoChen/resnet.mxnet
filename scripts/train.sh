@@ -1,6 +1,4 @@
 #!/bin/bash
-workspace='/mnt/truenas/scratch/xiaotao.chen/Repositories/tmp/resnet.mxnet'
-cd ${workspace}
 
 if [ $# -ne 2 ]; then
    echo "input argument counts is $#, which requires 2, means network, kv type, to exit"
