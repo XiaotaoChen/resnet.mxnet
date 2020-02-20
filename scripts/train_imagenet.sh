@@ -11,6 +11,8 @@ gpus="0,1,2,3,4,5"
 dataset='imagenet'
 data_dir='./imagenet_data_new'
 benchmark=1
+data_nthreads=4
+
 
 python3 train.py \
     --network ${network} \
@@ -22,4 +24,6 @@ python3 train.py \
     --gpus ${gpus} \
     --dataset ${dataset} \
     --data_dir ${data_dir} \
-    --benchmark ${benchmark}
+    --benchmark ${benchmark} \
+    --data_nthreads ${data_nthreads} \
+>> tmp.log 2>&1
