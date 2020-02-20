@@ -46,11 +46,16 @@ def main(config):
         devs = mx.cpu() if args.gpus is None or args.gpus == '-1' else mx.gpu(hvd.local_rank())
         num_workers = hvd.size()
         rank = hvd.rank()
+        config.batch_size = config.batch_per_gpu
+        # horovod divide num_workers implictly.
+        rescale_grad = 1.0 / config.batch_size
     else:
         kv = mx.kvstore.create(config.kv_store)
         devs = mx.cpu() if args.gpus is None or args.gpus == '-1' else [mx.gpu(int(i)) for i in config.gpu_list]
         num_workers = kv.num_workers
         rank = kv.rank
+        config.batch_size = config.batch_per_gpu * len(config.gpu_list)
+        rescale_grad = 1.0 / config.batch_size / num_workers
 
     if config.network == 'test_symbol':
         config.batch_size = 10
@@ -173,11 +178,13 @@ def main(config):
                                             warmup_begin_lr=config.warmup_lr,
                                             warmup_steps=int(config.warm_epoch * epoch_size))
 
+    if (rank == 0):
+        print("********* lr:{}, rescale_grad:{}, batch_size:{}, num_workers:{} **********".format(lr, rescale_grad, config.batch_size, num_workers))
     optimizer_params = {
         'learning_rate': lr,
         'wd': config.wd,
         'lr_scheduler': lr_scheduler,
-        'rescale_grad': 1.0 / config.batch_size / num_workers,
+        'rescale_grad': rescale_grad,
         'multi_precision': config.multi_precision}
     # Only a limited number of optimizers have 'momentum' property
     has_momentum = {'sgd', 'dcasgd', 'nag', 'signum', 'lbsgd'}
