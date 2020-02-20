@@ -86,7 +86,9 @@ def main(config):
                                                 batch_size=config.batch_size,
                                                 data_nthreads=config.data_nthreads,
                                                 num_workers=num_workers,
-                                                rank=rank)
+                                                rank=rank,
+                                                benchmark=config.benchmark,
+                                                num_classes=config.num_classes)
         # train, val, num_examples = imagenet_iterator(data_dir=config.data_dir,
         #                                              batch_size=config.batch_size,
         #                                              num_workers=num_workers,
@@ -230,8 +232,9 @@ def main(config):
 
     if config.use_horovod == 1:
         opt = mx.optimizer.create(config.optimizer, sym=symbol, **optimizer_params)
-        opt = hvd.DistributedOptimizer(opt, rank)
-        hvd.barrier()
+        # opt = hvd.DistributedOptimizer(opt, rank)
+        opt = hvd.DistributedOptimizer(opt)
+        # hvd.barrier()
         if arg_params is not None:
             hvd.broadcast_parameters(arg_params, root_rank=0)
         if aux_params is not None:

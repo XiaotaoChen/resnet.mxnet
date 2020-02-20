@@ -3,7 +3,7 @@ kind: MPIJob
 metadata:
   name: imagenet
 spec:
-  slotsPerWorker: 6
+  slotsPerWorker: 4
   cleanPodPolicy: Running
   mpiReplicaSpecs:
     Launcher:
@@ -17,7 +17,7 @@ spec:
              - /root/3rdparty/openmpi4.0/bin/mpirun
              - --allow-run-as-root
              - -np
-             - "12"
+             - "8"
              - -bind-to
              - none
              - -map-by
@@ -38,7 +38,7 @@ spec:
              - ^openib
              - bash
              - ./scripts/train_imagenet.sh
-             workingDir: /mnt/truenas/scratch/xiaotao.chen/Repositories/tmp/resnet.mxnet
+             workingDir: /mnt/truenas/scratch/xiaotao.chen/Repositories/resnet.mxnet
 
     Worker:
       replicas: 2
@@ -49,7 +49,7 @@ spec:
             name: imagenet
             resources:
               limits:
-                nvidia.com/gpu: 6
+                nvidia.com/gpu: 4
             volumeMounts:
             - mountPath: /mnt
               name: vol1

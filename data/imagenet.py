@@ -233,12 +233,18 @@ def multiple_imagenet_iterator(data_dir, batch_size, num_parts, image_shape, dat
 
 
 # Two functions for reading data from record file or raw images
-def get_data_rec(data_dir, batch_size, data_nthreads, num_workers, rank):
+def get_data_rec(data_dir, batch_size, data_nthreads, num_workers, rank, benchmark=0, num_classes=1000):
     jitter_param = 0.4
     lighting_param = 0.1
     mean_rgb = [123.68, 116.779, 103.939]
     std_rgb = [58.393, 57.12, 57.375]
     num_examples = 1281167
+    image_shape = (3, 224, 224)
+
+    if benchmark is not None and benchmark == 1:
+        data_shape = (batch_size,) + image_shape
+        train = SyntheticDataIter(num_classes, data_shape, 5005, np.float32)
+        return (train, None, num_examples)
 
     train_data = mx.io.ImageRecordIter(
         path_imgrec         = os.path.join(data_dir, "train.rec"),
@@ -247,7 +253,7 @@ def get_data_rec(data_dir, batch_size, data_nthreads, num_workers, rank):
         shuffle             = True,
         batch_size          = batch_size,
         label_width         = 1,
-        data_shape          = (3, 224, 224),
+        data_shape          = image_shape,
         mean_r              = mean_rgb[0],
         mean_g              = mean_rgb[1],
         mean_b              = mean_rgb[2],
