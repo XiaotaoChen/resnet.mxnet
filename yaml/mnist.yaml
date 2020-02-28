@@ -45,7 +45,7 @@ spec:
                 - '--epochs'
                 - '5'
     Worker:
-      replicas: 2
+      replicas: 1
       template:
         spec:
           containers:

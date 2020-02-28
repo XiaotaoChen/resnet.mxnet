@@ -1,5 +1,7 @@
 #!/bin/bash
 
+workspace=/mnt/truenas/upload/xiaotao.chen/Repositories/resnet.mxnet
+cd ${workspace}
 
 network='resnet'
 lr=0.2
