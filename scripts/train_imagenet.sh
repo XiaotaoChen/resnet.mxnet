@@ -4,12 +4,13 @@ workspace=/mnt/truenas/upload/xiaotao.chen/Repositories/resnet.mxnet
 cd ${workspace}
 
 network='resnet'
-lr=0.2
+model_prefix='4node'
+lr=0.8
 use_horovod=1
 batch_per_gpu=64
 warmup_lr=0.1
 warm_epoch=5
-gpus="0,1,2,3"
+gpus="0,1,2,3,4,5,6,7"
 dataset='imagenet'
 data_dir='./imagenet_data_new'
 benchmark=1
@@ -27,4 +28,5 @@ python3 train.py \
     --dataset ${dataset} \
     --data_dir ${data_dir} \
     --benchmark ${benchmark} \
-    --data_nthreads ${data_nthreads}
+    --data_nthreads ${data_nthreads} \
+    --model_prefix ${model_prefix}

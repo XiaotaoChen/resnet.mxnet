@@ -253,7 +253,8 @@ def main(config):
                    begin_epoch=config.begin_epoch,
                    num_epoch=config.num_epoch,
                    kvstore=None,
-                   rank=rank)
+                   rank=rank,
+                   hvd=hvd if config.use_horovod else None)
     else:
         solver.fit(train_data=train,
                    eval_data=val,

@@ -30,6 +30,12 @@ def _as_list(obj):
     else:
         return [obj]
 
+def sync_params(hvd, params):
+    assert isinstance(params, dict), "params must be dict"
+    for k, v in params.items():
+        hvd.allreduce_(v, average=True, name=k)
+    for k, v in params.items():
+        v.wait_to_read()
 
 class Solver(object):
     def __init__(self, symbol, data_names, label_names,
@@ -61,7 +67,7 @@ class Solver(object):
             aux_params=None, allow_missing=False,
             optimizer=None, optimizer_params=None,
             begin_epoch=0, num_epoch=None,
-            kvstore=None, rank=0):
+            kvstore=None, rank=0, hvd=None):
 
         self.module.bind(data_shapes=self.data_shapes, label_shapes=self.label_shapes, for_training=True)
         self.module.init_params(initializer=initializer,
@@ -80,8 +86,8 @@ class Solver(object):
         temp_count = 0
         # training loop
         for epoch in range(begin_epoch, num_epoch):
-            if temp_count > 200:
-                break
+            # if temp_count > 200:
+            #     break
 
             train_time = AverageMeter()
             kvstore_sync_time = AverageMeter()
@@ -94,8 +100,8 @@ class Solver(object):
             data_iter = iter(train_data)
             end_of_batch = False
             next_data_batch = next(data_iter)
-            # while not end_of_batch:
-            while temp_count <= 200:
+            while not end_of_batch:
+            # while temp_count <= 200:
                 # ndarray.waitall()
                 start_time = time.time()
                 data_batch = next_data_batch
@@ -156,18 +162,23 @@ class Solver(object):
             self.logger.info('Epoch[%d] Time cost=%.3f', epoch, (toc - tic))
 
             arg_params, aux_params = self.module.get_params()
+            if hvd is not None and hvd.size() > 1:
+                # for horovod training to sync aux parameters, such as: moving var/mean
+                print("sync arg, aux for horovod training")
+                sync_params(hvd, arg_params)  # arg params are weight, there are synced by iteration with same gradient.
+                sync_params(hvd, aux_params)
             self.module.set_params(arg_params, aux_params)
 
-            # if epoch_end_callback is not None and rank == 0:
-            #     for callback in _as_list(epoch_end_callback):
-            #         callback(epoch, self.symbol, arg_params, aux_params)
-            # if eval_data:
-            #     res = self.module.score(eval_data, validate_metric,
-            #                             score_end_callback=None,
-            #                             batch_end_callback=None,
-            #                             reset=True,
-            #                             epoch=epoch)
-            #     for name, val in res:
-            #         self.logger.info('Epoch[%d] Validation-%s=%f', epoch, name, val)
+            if epoch_end_callback is not None and rank == 0:
+                for callback in _as_list(epoch_end_callback):
+                    callback(epoch, self.symbol, arg_params, aux_params)
+            if eval_data:
+                res = self.module.score(eval_data, validate_metric,
+                                        score_end_callback=None,
+                                        batch_end_callback=None,
+                                        reset=True,
+                                        epoch=epoch)
+                for name, val in res:
+                    self.logger.info('Epoch[%d] Validation-%s=%f', epoch, name, val)
 
             train_data.reset()
