@@ -11,19 +11,21 @@ spec:
       template:
          spec:
            containers:
-           - image: artifactory.tusimple.ai/docker-rnd/cxt/pipeline-base-lidar0108/cuda10.0-cudnn7:dist_example
+           - image: artifactory.tusimple.ai/docker-rnd/cxt/pipeline-base-lidar0108/cuda10.0-cudnn7:nccl
              name: imagenet
              command:
              - /root/3rdparty/openmpi4.0/bin/mpirun
              - --allow-run-as-root
              - -np
-             - "16"
+             - "8"
              - -bind-to
              - none
              - -map-by
              - slot
              - -x
              - NCCL_DEBUG=INFO
+             - -x
+             - NCCL_SHM_DISABLE=1
              - -x
              - LD_LIBRARY_PATH
              - -x
@@ -39,13 +41,15 @@ spec:
              - bash
              - ./scripts/train_imagenet.sh
              workingDir: /mnt/truenas/upload/xiaotao.chen/Repositories/resnet.mxnet
+           imagePullSecrets:
+             - name: artifactory
 
     Worker:
-      replicas: 2
+      replicas: 1
       template:
         spec:
           containers:
-          - image: artifactory.tusimple.ai/docker-rnd/cxt/pipeline-base-lidar0108/cuda10.0-cudnn7:dist_example
+          - image: artifactory.tusimple.ai/docker-rnd/cxt/pipeline-base-lidar0108/cuda10.0-cudnn7:nccl
             name: imagenet
             resources:
               limits:
@@ -59,3 +63,5 @@ spec:
               path: /mnt
               type: ""
             name: vol1
+          imagePullSecrets:
+             - name: artifactory
