@@ -9,15 +9,16 @@ config.dataset = "imagenet"
 config.model_prefix = "resnet50"
 config.network = "resnet"
 config.depth = 50
+config.output_dir="/mnt/truenas/scratch/xiaotao.chen/outputs/infra/resnet"
 
 # data
-config.data_dir = '/data/ILSVRC2012'
+config.data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/imagenet/imagenet_data_new'
 config.batch_per_gpu = 64
 config.batch_size = config.batch_per_gpu * len(config.gpu_list)
 config.kv_store = 'local'
 
 # optimizer
-config.lr = 3.2
+config.lr = 0.2
 config.wd = 0.0001
 config.momentum = 0.9
 config.multi_precision = True
@@ -31,7 +32,7 @@ config.num_epoch = 90
 config.frequent = 20
 # for distributed training
 config.warmup_lr = 0.0
-config.warm_epoch = 0
+config.warm_epoch = 5
 config.lr_scheduler = 'MultiFactor'
 config.optimizer = 'sgd'
 config.islars = 0
@@ -48,7 +49,7 @@ config.use_multiple_iter = False
 config.use_dali_iter = False
 config.memonger = False
 # using horovod or not
-config.use_horovod = 0
+config.use_horovod = 1
 
 
 

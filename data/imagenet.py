@@ -1,6 +1,5 @@
 import os
-# import config
-from config.example_config import config
+from config.edict_config import config
 import mxnet as mx
 from mxnet.io import DataBatch, DataIter
 import numpy as np

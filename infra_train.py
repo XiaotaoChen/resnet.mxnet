@@ -1,7 +1,7 @@
 import logging, os
 import argparse
 # import config
-from config.example_config import config
+from config.edict_config import config
 import mxnet as mx
 from core.solver import Solver
 from core.memonger_v2 import search_plan_to_layer
@@ -14,7 +14,7 @@ import horovod.mxnet as hvd
 
 def main(config):
     # log file
-    log_dir = "./log"
+    log_dir = os.path.join(config.output_dir, "./log")
     if not os.path.exists(log_dir):
         try:
             os.mkdir(log_dir)
@@ -31,7 +31,7 @@ def main(config):
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
     # model folder
-    model_dir = "./model"
+    model_dir = os.path.join(config.output_dir, "./model")
     if not os.path.exists(model_dir):
         try:
             os.mkdir(model_dir)
@@ -43,14 +43,19 @@ def main(config):
         print("--------------- using horovod to update parameters ---------------------")
         # Initialize Horovod
         hvd.init()
-        devs = mx.cpu() if config.gpu_list is None or len(config.gpu_list) == 0 else mx.gpu(hvd.local_rank())
+        devs = mx.cpu() if config.gpu_list is None or config.gpu_list == '-1' else mx.gpu(hvd.local_rank())
         num_workers = hvd.size()
         rank = hvd.rank()
+        config.batch_size = config.batch_per_gpu
+        # horovod divide num_workers implictly.
+        rescale_grad = 1.0 / config.batch_size
     else:
         kv = mx.kvstore.create(config.kv_store)
-        devs = mx.cpu() if config.gpu_list is None or len(config.gpu_list) == 0 else [mx.gpu(int(i)) for i in config.gpu_list]
+        devs = mx.cpu() if config.gpu_list is None or config.gpu_list == '-1' else [mx.gpu(int(i)) for i in config.gpu_list]
         num_workers = kv.num_workers
         rank = kv.rank
+        config.batch_size = config.batch_per_gpu * len(config.gpu_list)
+        rescale_grad = 1.0 / config.batch_size / num_workers
 
     if config.network == 'test_symbol':
         config.batch_size = 10
@@ -105,12 +110,13 @@ def main(config):
                                         warmup_mode='linear',
                                         warmup_begin_lr=config.warmup_lr,
                                         warmup_steps=int(config.warm_epoch * epoch_size))
-
+    if (rank == 0):
+        print("********* lr:{}, rescale_grad:{}, batch_size:{}, num_workers:{} **********".format(lr, rescale_grad, config.batch_size, num_workers))
     optimizer_params = {
         'learning_rate': lr,
         'wd': config.wd,
         'lr_scheduler': lr_scheduler,
-        'rescale_grad': 1.0 / config.batch_size / num_workers}
+        'rescale_grad': rescale_grad}
     # Only a limited number of optimizers have 'momentum' property
     has_momentum = {'sgd', 'dcasgd', 'nag', 'signum', 'lbsgd'}
     if config.optimizer in has_momentum:
@@ -127,15 +133,15 @@ def main(config):
                     label_shapes=label_shapes,
                     logger=logging,
                     context=devs)
-    # epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.model_prefix)
-    epoch_end_callback = _save_model("./model/" + config.model_prefix, rank)
+    epoch_end_callback = mx.callback.do_checkpoint(os.path.join(model_dir, config.model_prefix))
+    # epoch_end_callback = _save_model(os.path.join(model_dir, config.model_prefix), rank)
     batch_end_callback = mx.callback.Speedometer(config.batch_size, config.frequent)
     # batch_end_callback = DetailSpeedometer(config.batch_size, config.frequent)
     initializer = mx.init.Xavier(rnd_type='gaussian', factor_type='in', magnitude=2)
     arg_params = None
     aux_params = None
     if config.begin_epoch > 0:
-        _, arg_params, aux_params = _load_model("./model/" + config.model_prefix, config.begin_epoch)
+        _, arg_params, aux_params = _load_model(os.path.join(model_dir, config.model_prefix), config.begin_epoch)
 
     if config.use_horovod == 1:
         opt = mx.optimizer.create(config.optimizer, sym=symbol, **optimizer_params)
@@ -195,22 +201,5 @@ def _load_model(model_prefix, model_load_epoch):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Train resnet network')
-    # general
-    parser.add_argument('--network', help='network name', default=config.network, type=str)
-    parser.add_argument('--kv_type', help='kv_type', default=config.kv_store, type=str)
-    
-    args = parser.parse_args()
-
-    config.network = args.network
-    assert args.kv_type in ('hvd', 'local', 'dist_sync')
-    if args.kv_type == 'hvd':
-        config.use_horovod = True
-        config.kv_store = 'local'
-        config.batch_size = config.batch_per_gpu
-    else:
-        config.use_horovod = False
-        config.kv_store = args.kv_type
-
     pprint.pprint(config)
     main(config)
