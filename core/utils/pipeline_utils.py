@@ -3,10 +3,10 @@ from mms import mms
 from datetime import datetime
 import shutil
 
-from utils.graph_optimize import mergebn_for_deploy, attach_quantize_node
-from utils.mms_services import upload_model, get_models_benchmark_id
-from utils.split_trained_scale import split_int8_params
-from utils.match_trt_scale_with_trained_scale import match_trt_with_quant_training
+from .graph_optimize import mergebn_for_deploy, attach_quantize_node
+from .mms_services import upload_model, get_models_benchmark_id
+from .split_trained_scale import split_int8_params
+from .match_trt_scale_with_trained_scale import match_trt_with_quant_training
 
 def upload_model_to_mms(name, model_type, extra_model_tags, file_list, pAutoPipeline):
     # to upload model to mms

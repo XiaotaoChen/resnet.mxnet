@@ -51,10 +51,6 @@ config.memonger = False
 # using horovod or not
 config.use_horovod = 1
 
-
-
-
-
 # network config
 if config.dataset == "imagenet":
     config.num_classes = 1000
@@ -71,3 +67,11 @@ if config.dataset == "imagenet":
         config.filter_list = [64, 64, 128, 256, 512]
         config.bottle_neck = False
     config.num_stage = 4
+
+# pipeline 
+config.AutoPipelineParam = edict()
+config.AutoPipelineParam.model_tags = ["test",]
+config.AutoPipelineParam.TrainData = edict()
+config.AutoPipelineParam.TrainData.tags = ["imagenet",]
+config.AutoPipelineParam.TestData = edict()
+config.AutoPipelineParam.TestData.tags = ["imagenet",]

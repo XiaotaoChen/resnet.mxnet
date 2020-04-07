@@ -12,6 +12,8 @@ import datetime
 import pprint
 import horovod.mxnet as hvd
 
+from core.utils.pipeline_utils import upload_model_to_mms
+
 def main(config):
     # log file
     log_dir = os.path.join(config.output_dir, "./log")
@@ -181,6 +183,25 @@ def main(config):
                    num_epoch=config.num_epoch,
                    kvstore=kv,
                    rank=rank)
+
+    # upload model to mms
+    if rank == 0:
+        symbol.save(os.path.join(model_dir, config.model_prefix + "-test.json"))
+
+        pAutoPipeline = config.AutoPipelineParam
+        name = "reset_for_infra"
+        model_type = "classification"
+        extra_model_tags = ["m_fp32",]
+        file_list = [os.path.join(model_dir, config.model_prefix + '-{:0>4}.params'.format(config.num_epoch)),
+                     os.path.join(model_dir, config.model_prefix + "-test.json")]
+        print("file list:\n{}".format(file_list))
+        result = upload_model_to_mms(name, model_type, extra_model_tags, file_list, pAutoPipeline)
+        if result['success']:
+            print("success upload model, model id:{}".format(result['model_id']))
+        else:
+            print("failed upload model, error msg:{}".format(result['err_msg']))
+
+
 
 def _save_model(model_prefix, rank=0):
     if model_prefix is None:
