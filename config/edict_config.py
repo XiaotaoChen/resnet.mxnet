@@ -28,7 +28,7 @@ else:
     config.lr_step = [120, 160, 240]
 config.lr_factor = 0.1
 config.begin_epoch = 0
-config.num_epoch = 90
+config.num_epoch = 1 #90
 config.frequent = 20
 # for distributed training
 config.warmup_lr = 0.0
