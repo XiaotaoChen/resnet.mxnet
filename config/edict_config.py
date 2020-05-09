@@ -4,18 +4,16 @@ config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 # config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
-# config.gpu_list = [0, 1, 2, 3]
-config.gpu_list = [4, 5, 6, 7]
+config.gpu_list = [0, 1, 2, 3]
+# config.gpu_list = [4, 5, 6, 7]
 config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
 config.network = "resnet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
 config.depth = 18
-config.model_load_epoch =30
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
-config.model_load_prefix = "experiments/GDRQ_CXX/1031_4bits_resnet50_imagenet_bs512/resnet50_imagenet"
-config.retrain = False
+config.model_load_epoch =90
+config.model_load_prefix = "experiments/resnet18_imagenet_0508/resnet18_imagenet"
+config.retrain = True
 config.allow_missing = True
-# config.use_global_stats=False
-# config.fix_gamma=True
 
 
 
@@ -126,38 +124,32 @@ else:
 
 # for quantize int8 training
 config.quantize_flag = True
-
-# for GDRQ
-# batch size =512, 50 epoch -> 125125
-# batch size =256, 50 epoch -> 250250
-# batch size =128, 50 epoch -> 500500
 config.quantize_setting = {
+# for GDRQ
     "weight":{
-        "quantize_op_name": "Quantization_int8",
-        "init_value": 0,
+        "quantize_op_name": "GDRQ_CXX",
+        "init_value": 1.0,
         "attrs": {
             "nbits": "4",
-            "quant_mode": "minmax",
+            "fix_alpha": "False",
+            "group_size": "-1",
             "is_weight": "True",
-            "is_weight_perchannel": "False",
+            "lamda": "0.001",
             "delay_quant": "0",
-            "ema_decay": "0.99",
-            "grad_mode": "ste",
-            "fix_act_scale": "False"
+            "ktimes": "3"
         }
     },
     "act":{
-        "quantize_op_name": "Quantization_int8",
-        "init_value": 0,
+        "quantize_op_name": "GDRQ_CXX",
+        "init_value": 11.0,
         "attrs": {
             "nbits": "4",
-            "quant_mode": "minmax",
+            "fix_alpha": "False",
+            "group_size": "-1",
             "is_weight": "False",
-            "is_weight_perchannel": "False",
+            "lamda": "0.001",
             "delay_quant": "0",
-            "ema_decay": "0.99",
-            "grad_mode": "ste",
-            "fix_act_scale": "False"
+            "ktimes": "3"
         }
     }
 }
@@ -169,6 +161,7 @@ config.fix_bn = False
 if config.quantize_flag is False:
     config.output_dir = "{}_0508".format(config.model_prefix)
 else:
+    config.num_epoch = 120
     config.output_dir = "{}_{}_w{}_act{}".format(config.model_prefix,
                                                 config.quantize_setting["act"]["quantize_op_name"],
                                                 config.quantize_setting["weight"]["attrs"]["nbits"], 

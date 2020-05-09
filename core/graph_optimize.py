@@ -291,6 +291,66 @@ def attach_quantize_node(symbol, out_shape_dict, weight_setting, act_setting,
     outputs = outputs[0] if len(outputs) == 1 else mx.sym.Group(outputs)
     return outputs
 
+def do_kurt(var, shape, kT=1.8, num_layers=1, lambd=1.0):
+    cnt = 1
+    for dim in shape:
+        cnt *= dim
+    mean = mx.sym.mean(name=var.name+"_mean", data=var)
+    meaned_var = mx.sym.broadcast_sub(name=var.name+"_broadcast_sub", lhs=var, rhs=mean)
+    norm_var = mx.sym.norm(name=var.name+"_norm", data=meaned_var)
+
+    # meaned_std = 1.0/np.sqrt(cnt) * norm_var
+    # kurt = 1.0/cnt * mx.sym.sum((mx.sym.broadcast_div(meaned_var, meaned_std))**4)
+    # kurt_loss = lambd/num_layers * (kurt - kT)
+    # return mx.sym.make_loss(kurt_loss, grad_scale=1)
+
+    kurt_loss = mx.sym.sum(name=var.name+"_sum", data=(mx.sym.broadcast_div(meaned_var, norm_var)) **4)
+
+    return mx.sym.make_loss(name=var.name+"_loss", data=kurt_loss, grad_scale= lambd * cnt / num_layers)
+
+def attach_kurt_loss(symbol, out_shape_dict, lamba=1.0, kT=1.8, total_layers=10):
+    jgraph = json.loads(symbol.tojson())
+    jnodes = jgraph["nodes"]
+    node_map = {}
+    node_op_map = {}
+
+    outputs = []
+
+    for nid, node in enumerate(jnodes):
+        # edges are [which_node, which_output, type(? not sure)]
+        # mx.symbol has an attribute of __getitem__. sym[1] gives the second output
+        children = [node_map[e[0]][e[1]] for e in node["inputs"]]
+        attrs = node.get("attrs", {})
+        node_name = node["name"]
+        op_name = node["op"]
+        if op_name == "null":
+            attrs = dict({k:v for k, v in attrs.items() if k.startswith("__")})
+            node_map[nid] = mx.sym.var(node_name, **attrs)
+            node_op_map[nid] = ["Variable"]
+        else:
+            if op_name.startswith("_contrib_"):
+                op_name = op_name.replace("_contrib_", "")
+                operator = eval("mx.sym.contrib." + op_name)
+            elif op_name.startswith("_"):
+                operator = eval("mx.sym._internal." + op_name)
+            else:
+                operator = eval("mx.sym." + op_name)
+            res = operator(*children, **attrs, name=node_name)
+            node_map[nid] = res
+            node_op_map[nid] = [op_name]
+
+        # attach kurt loss
+        for var in children:
+            if var.name.endswith("_weight"):
+                assert var.name in out_shape_dict.keys(), "{} Variable is not in shape_dict".format(var.name)
+                print(var.name)
+                outputs.append(do_kurt(var, shape=out_shape_dict[var.name]))
+    for e in jgraph["heads"]:
+        outputs.append(node_map[e[0]][e[1]])
+
+    # outputs = [node_map[e[0]][e[1]] for e in jgraph["heads"]]
+    outputs = outputs[0] if len(outputs) == 1 else mx.sym.Group(outputs)
+    return outputs
 
 if __name__ == "__main__":
     sym = mx.sym.load("source.json")
