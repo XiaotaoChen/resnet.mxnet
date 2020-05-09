@@ -4,24 +4,13 @@ config = edict()
 
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 # config.gpu_list = [0, 1, 2, 3, 4, 5, 6, 7]
-config.gpu_list = [0, 1, 2, 3]
-config.platform = "aliyun"
+# config.gpu_list = [0, 1, 2, 3]
+config.gpu_list = [4, 5, 6, 7]
 config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
-config.network = "preact_resnet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
+config.network = "resnet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
 config.depth = 18
-# if config.dataset == "imagenet":
-#     config.depth = 18
-# elif config.dataset == "cifar10" :
-#     config.depth = 50
-# elif config.dataset == "cifar100":
-#     config.depth = 18
 config.model_load_epoch =30
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
-# "experiments/1017_resnet20_cifar10/resnet20_cifar10"
-# "model/1011_resnet18_imagenet_fp32/1011_resnet18_imagenet"
-# "experiments/1026_resnet_imagenet18_imagenet/resnet_imagenet18_imagenet"
-# "model/resnet50_new/resnet_imagenet"
-# "experiments/GDRQ_CXX/1031_4bits_resnet50_imagenet_bs512/resnet50_imagenet"
 config.model_load_prefix = "experiments/GDRQ_CXX/1031_4bits_resnet50_imagenet_bs512/resnet50_imagenet"
 config.retrain = False
 config.allow_missing = True
@@ -31,23 +20,10 @@ config.allow_missing = True
 
 
 # data
-if config.platform == 'truenas':
-    if config.dataset == "imagenet":
-        config.data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/imagenet/ILSVRC2012'
-    elif config.dataset == "cifar10":
-        config.data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/cifar10'
-    elif config.dataset == "cifar100":
-        config.data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/cifar100'
-else:
-    if config.dataset == "imagenet":
-        config.data_dir = '/mnt/tscpfs/bigfile/data/ILSVRC2012'
-    elif config.dataset == "cifar10":
-        config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar10"
-    elif config.dataset == "cifar100":
-        config.data_dir = "/mnt/tscpfs/xiaotao.chen/dataset/cifar100"
-config.batch_per_gpu = 128
+config.data_dir = "imagenet_data_new"
+config.batch_per_gpu = 64
 config.batch_size = config.batch_per_gpu * len(config.gpu_list)
-config.kv_store = 'local'
+config.kv_store = 'device'
 
 # optimizer
 
@@ -60,11 +36,11 @@ else:
 config.momentum = 0.9
 config.multi_precision = True
 if config.dataset == "imagenet":
-    # config.lr_step = [30, 60, 90]
-    # config.num_epoch = 100
-    config.lr_step = [30, 60, 85, 95]   # PACT
+    config.lr_step = [30, 60, 80]
+    config.num_epoch = 90
+    # config.lr_step = [30, 60, 85, 95]   # PACT
     # config.lr_step = [30, 70, 90]
-    config.num_epoch = 110
+    # config.num_epoch = 110
 elif config.dataset == "cifar10":
     config.lr_step = [60, 120]
     config.num_epoch = 200
@@ -160,7 +136,7 @@ config.quantize_setting = {
         "quantize_op_name": "Quantization_int8",
         "init_value": 0,
         "attrs": {
-            "nbits": "3",
+            "nbits": "4",
             "quant_mode": "minmax",
             "is_weight": "True",
             "is_weight_perchannel": "False",
@@ -190,14 +166,10 @@ config.quantize_setting = {
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
 config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
 config.fix_bn = False
-# config.output_dir = "1028_resnet18_" + config.model_prefix
-config.output_dir = "{}/1101_{}_bs{}_w{}_act{}".format(config.quantize_setting["act"]["quantize_op_name"], 
-                                             config.model_prefix, config.batch_per_gpu * len(config.gpu_list),
-                                             config.quantize_setting["weight"]["attrs"]["nbits"], 
-                                             config.quantize_setting["act"]["attrs"]["nbits"])
-# config.output_dir = "test"
-
-# if config.quantize_flag and config.retrain:
-#     config.lr *= 0.1
-#     config.lr_step = [120, 140]
-#     config.num_epoch = 150
+if config.quantize_flag is False:
+    config.output_dir = "{}_0508".format(config.model_prefix)
+else:
+    config.output_dir = "{}_{}_w{}_act{}".format(config.model_prefix,
+                                                config.quantize_setting["act"]["quantize_op_name"],
+                                                config.quantize_setting["weight"]["attrs"]["nbits"], 
+                                                config.quantize_setting["act"]["attrs"]["nbits"])
