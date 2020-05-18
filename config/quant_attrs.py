@@ -44,8 +44,9 @@ GDRQ
             "group_size": "-1",
             "is_weight": "True",
             "lamda": "0.001",
-            "delay_quant": "0",
-            "ktimes": "3"
+            "do_quant": "False",
+            "ktimes": "3",
+            "grad_mode": "ste"
         }
     },
     "act":{
@@ -57,8 +58,9 @@ GDRQ
             "group_size": "-1",
             "is_weight": "False",
             "lamda": "0.001",
-            "delay_quant": "0",
-            "ktimes": "3"
+            "do_quant": "False",
+            "ktimes": "3",
+            "grad_mode": "ste"
         }
     }
 

@@ -1,3 +1,5 @@
+import ctypes
+_=ctypes.CDLL("/mnt/truenas/scratch/xiaotao.chen/Repositories/mx_ops/additional.so")
 import logging, os
 import argparse
 # import config
