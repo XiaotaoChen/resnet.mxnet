@@ -12,7 +12,7 @@ config.depth = 18
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
 config.model_load_epoch =90
 config.model_load_prefix = "experiments/resnet18_imagenet_0508/resnet18_imagenet"
-config.retrain = True
+config.retrain = False
 config.allow_missing = True
 
 
@@ -128,41 +128,48 @@ config.quantize_setting = {
 # for GDRQ
     "weight":{
         "quantize_op_name": "GDRQ_CXX",
-        "init_value": 1.0,
+        "init_value": 0.5,
         "attrs": {
             "nbits": "4",
             "fix_alpha": "False",
             "group_size": "-1",
             "is_weight": "True",
             "lamda": "0.001",
-            "delay_quant": "0",
-            "ktimes": "3"
+            "do_quant": "True",
+            "ktimes": "3",
+            "grad_mode": "ste"
         }
     },
     "act":{
         "quantize_op_name": "GDRQ_CXX",
-        "init_value": 11.0,
+        "init_value": 10,
         "attrs": {
             "nbits": "4",
             "fix_alpha": "False",
             "group_size": "-1",
             "is_weight": "False",
             "lamda": "0.001",
-            "delay_quant": "0",
-            "ktimes": "3"
+            "do_quant": "True",
+            "ktimes": "3",
+            "grad_mode": "clip"
         }
     }
 }
 
+# reset
+weight_count_map = {18:22, 50:54}
+
+config.kurtloss = True
+config.weight_count = weight_count_map[config.depth]
+if config.kurtloss:
+    config.quantize_flag = False
+
 # config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
 config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
-config.fix_bn = False
-if config.quantize_flag is False:
-    config.output_dir = "{}_0508".format(config.model_prefix)
-else:
+
+config.output_dir = "{}_kurtloss".format(config.model_prefix)
+
+if config.quantize_flag:
+    config.lr_step = [30, 60, 100]
     config.num_epoch = 120
-    config.output_dir = "{}_{}_w{}_act{}".format(config.model_prefix,
-                                                config.quantize_setting["act"]["quantize_op_name"],
-                                                config.quantize_setting["weight"]["attrs"]["nbits"], 
-                                                config.quantize_setting["act"]["attrs"]["nbits"])

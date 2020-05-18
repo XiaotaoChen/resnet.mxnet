@@ -305,9 +305,10 @@ def do_kurt(var, shape, kT=1.8, num_layers=1, lambd=1.0):
     # kurt_loss = lambd/num_layers * (kurt - kT)
     # return mx.sym.make_loss(kurt_loss, grad_scale=1)
 
-    kurt_loss = mx.sym.sum(name=var.name+"_sum", data=(mx.sym.broadcast_div(meaned_var, norm_var)) **4)
+    kurt_val = cnt * mx.sym.sum(name=var.name+"_sum", data=(mx.sym.broadcast_div(meaned_var, norm_var)) **4)
+    kurt_loss = (kurt_val - kT)**2
 
-    return mx.sym.make_loss(name=var.name+"_loss", data=kurt_loss, grad_scale= lambd * cnt / num_layers)
+    return mx.sym.make_loss(name=var.name+"_loss", data=kurt_loss, grad_scale= lambd / num_layers)
 
 def attach_kurt_loss(symbol, out_shape_dict, lamba=1.0, kT=1.8, total_layers=10):
     jgraph = json.loads(symbol.tojson())
@@ -344,7 +345,7 @@ def attach_kurt_loss(symbol, out_shape_dict, lamba=1.0, kT=1.8, total_layers=10)
         for var in children:
             if var.name.endswith("_weight"):
                 assert var.name in out_shape_dict.keys(), "{} Variable is not in shape_dict".format(var.name)
-                print(var.name)
+                print("attach kurt loss for: {}".format(var.name))
                 outputs.append(do_kurt(var, shape=out_shape_dict[var.name]))
     for e in jgraph["heads"]:
         outputs.append(node_map[e[0]][e[1]])

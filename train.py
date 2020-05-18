@@ -15,6 +15,9 @@ import datetime
 import pprint
 from core.scheduler import WarmupMultiFactorScheduler
 
+from core.metric import *
+
+
 def main(config):
     output_dir = "experiments/" + config.output_dir
     if not os.path.exists(output_dir):
@@ -104,25 +107,24 @@ def main(config):
         symbol = eval(config.network)(num_classes=config.num_classes)
     elif config.network == "cifar10_sym":
         symbol = eval(config.network)()
-
-
-    if config.fix_bn:
-        from core.graph_optimize import fix_bn
-        print("********************* fix bn ***********************")
-        symbol = fix_bn(symbol)
-
-    if config.quantize_flag:
-        assert config.data_type == "float32", "current quantization op only support fp32 mode."
-        from core.graph_optimize import attach_quantize_node
+    
+    if config.quantize_flag or config.kurtloss:
         worker_data_shape = dict(data_shapes + label_shapes)
         _, out_shape, _ = symbol.get_internals().infer_shape(**worker_data_shape)
         out_shape_dictoinary = dict(zip(symbol.get_internals().list_outputs(), out_shape))
-        symbol = attach_quantize_node(symbol, out_shape_dictoinary, 
-                                      config.quantize_setting["weight"], config.quantize_setting["act"], 
-                                      config.quantized_op, config.skip_quantize_counts)
-        # symbol.save("attach_quant.json")
-        # raise NotImplementedError
-
+        
+        if config.kurtloss:
+            from core.graph_optimize import attach_kurt_loss
+            symbol = attach_kurt_loss(symbol, out_shape_dict=out_shape_dictoinary, lamba=1.0, kT=1.8, total_layers=config.weight_count)
+        elif config.quantize_flag:
+            assert config.data_type == "float32", "current quantization op only support fp32 mode."
+            from core.graph_optimize import attach_quantize_node
+            symbol = attach_quantize_node(symbol, out_shape_dictoinary, 
+                                        config.quantize_setting["weight"], config.quantize_setting["act"], 
+                                        config.quantized_op, config.skip_quantize_counts)
+            # symbol.save("attach_quant.json")
+            # raise NotImplementedError
+        
     # symbol.save(config.network + ".json")
     # raise NotImplementedError
     # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
@@ -204,9 +206,11 @@ def main(config):
         optimizer_params['warmup_epochs'] = config.warm_epoch # not work whne warmup_strategy is 'lars'
         optimizer_params['num_epochs'] = config.num_epoch
 
-    eval_metric = ['acc']
+    # eval_metric = ['acc']
+    eval_metric = ["custom_acc"]
     if config.dataset == "imagenet":
-        eval_metric.append(mx.metric.create('top_k_accuracy', top_k=5))
+        # eval_metric.append(mx.metric.create('top_k_accuracy', top_k=5))
+        eval_metric.append(mx.metric.create('custom_top_k_accuracy', top_k=5))
 
     solver = Solver(symbol=symbol,
                     data_names=data_names,
