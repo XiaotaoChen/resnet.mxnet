@@ -292,7 +292,7 @@ def attach_quantize_node(symbol, out_shape_dict, weight_setting, act_setting,
     outputs = outputs[0] if len(outputs) == 1 else mx.sym.Group(outputs)
     return outputs
 
-def do_kurt(var, shape, kT=1.8, num_layers=1, lambd=1.0):
+def do_kurt(var, shape, lamba, kT, weight_count):
     cnt = 1
     for dim in shape:
         cnt *= dim
@@ -308,9 +308,10 @@ def do_kurt(var, shape, kT=1.8, num_layers=1, lambd=1.0):
     kurt_val = cnt * mx.sym.sum(name=var.name+"_sum", data=(mx.sym.broadcast_div(meaned_var, norm_var)) **4)
     kurt_loss = (kurt_val - kT)**2
 
-    return mx.sym.make_loss(name=var.name+"_loss", data=kurt_loss, grad_scale= lambd / num_layers)
+    return mx.sym.make_loss(name=var.name+"_loss", data=kurt_loss, grad_scale= lamba / weight_count)
 
-def attach_kurt_loss(symbol, out_shape_dict, lamba=1.0, kT=1.8, total_layers=10):
+def attach_kurt_loss(symbol, out_shape_dict, lamba=1.0, kT=1.8, weight_count=1):
+    print("kurt loss setting lambda:{}, kT:{}, weight_count:{}".format(lamba, kT, weight_count))
     jgraph = json.loads(symbol.tojson())
     jnodes = jgraph["nodes"]
     node_map = {}
@@ -346,7 +347,7 @@ def attach_kurt_loss(symbol, out_shape_dict, lamba=1.0, kT=1.8, total_layers=10)
             if var.name.endswith("_weight"):
                 assert var.name in out_shape_dict.keys(), "{} Variable is not in shape_dict".format(var.name)
                 print("attach kurt loss for: {}".format(var.name))
-                outputs.append(do_kurt(var, shape=out_shape_dict[var.name]))
+                outputs.append(do_kurt(var, shape=out_shape_dict[var.name], lamba=lamba, kT=kT, weight_count=weight_count))
     for e in jgraph["heads"]:
         outputs.append(node_map[e[0]][e[1]])
 

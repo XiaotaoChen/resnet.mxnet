@@ -115,7 +115,10 @@ def main(config):
         
         if config.kurtloss:
             from core.graph_optimize import attach_kurt_loss
-            symbol = attach_kurt_loss(symbol, out_shape_dict=out_shape_dictoinary, lamba=1.0, kT=1.8, total_layers=config.weight_count)
+            symbol = attach_kurt_loss(symbol, out_shape_dict=out_shape_dictoinary, 
+                                      lamba=config.kurt_setting["lambda"], 
+                                      kT=config.kurt_setting["kT"], 
+                                      weight_count=config.kurt_setting["weight_count"])
         elif config.quantize_flag:
             assert config.data_type == "float32", "current quantization op only support fp32 mode."
             from core.graph_optimize import attach_quantize_node
