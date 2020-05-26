@@ -11,8 +11,8 @@ config.network = "resnet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "pre
 config.depth = 18
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
 config.model_load_epoch =90
-config.model_load_prefix = "experiments/resnet18_imagenet_0508/resnet18_imagenet"
-config.retrain = False
+config.model_load_prefix = "experiments/resnet18_imagenet_kurtloss_0518/resnet18_imagenet"
+config.retrain = True
 config.allow_missing = True
 
 
@@ -160,16 +160,20 @@ config.quantize_setting = {
 weight_count_map = {18:22, 50:54}
 
 config.kurtloss = True
-config.weight_count = weight_count_map[config.depth]
+config.kurt_setting={
+    "weight_count": weight_count_map[config.depth],
+    "lambda":1,
+    "kT":1.8
+}
 if config.kurtloss:
     config.quantize_flag = False
 
 # config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
-config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
+config.skip_quantize_counts = {"Convolution": 0, "FullyConnected": 0}
 
-config.output_dir = "{}_kurtloss".format(config.model_prefix)
+config.output_dir = "{}_kurtlossft_150_0526".format(config.model_prefix)
 
-if config.quantize_flag:
-    config.lr_step = [30, 60, 100]
-    config.num_epoch = 120
+if config.quantize_flag or config.kurtloss:
+    config.lr_step = [40, 80, 110]
+    config.num_epoch = 150
