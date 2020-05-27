@@ -25,6 +25,7 @@ from .operator.QIL_V3 import *
 from .operator.PACT import * # PACT_PY, DoReFa_PY
 from .operator.WNQ import *
 from .operator.GDRQ import *
+from .operator.quantization_int8 import *
 
 
 FLOAT32_DTYPE = 0
@@ -162,12 +163,16 @@ def create_quant_node(var, setting):
     quantize_op_name = setting.quantize_op_name
     attrs = setting.attrs
     assert quantize_op_name in ("Quantization_int8", "QIL", "DoReFa_PY", "DoReFa_CXX", "PACT", "PACT_CXX", 
-                                "WNQ", "GDRQ", "GDRQ_CXX")
+                                "WNQ", "GDRQ", "GDRQ_CXX", "Quantization_int8_PY")
 
     if quantize_op_name == "Quantization_int8":
         init_value = setting.init_value or 0
         minmax_var = mx.sym.var(name = var.name + "_minmax", init=mx.init.Constant(init_value))
         quanted_node = mx.sym.contrib.Quantization_int8(name=var.name, data=var, minmax=minmax_var, **attrs)
+    elif quantize_op_name == "Quantization_int8_PY":
+        init_value = setting.init_value or 0
+        minmax_var = mx.sym.var(name = var.name + "_minmax", init=mx.init.Constant(init_value))
+        quanted_node = mx.sym.Custom(name=var.name, data=var, minmax=minmax_var, **attrs, op_type="Quantization_int8_PY")
     elif quantize_op_name == "QIL":
         init_value = setting.init_value or 1.0
         pruning_var = mx.sym.var(name = var.name + "_pruning_point", init=get_constant(0), lr_mult=0.01, wd_mult=0)
