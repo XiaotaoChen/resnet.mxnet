@@ -186,11 +186,11 @@ def create_quant_node(var, setting):
         quanted_node = mx.sym.contrib.DoReFa(name=var.name, data=var, **attrs)
     elif quantize_op_name == "PACT":
         init_value = setting.init_value or 8.0
-        gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(init_value))
+        gamma_var = mx.sym.var(name = var.name + "_pact_gamma", init=get_constant(init_value))
         quanted_node = mx.sym.Custom(name=var.name, data=var, gamma=gamma_var, **attrs, op_type="PACT_PY")
     elif quantize_op_name == "PACT_CXX":
         init_value = setting.init_value or 8.0
-        gamma_var = mx.sym.var(name = var.name + "_gamma", init=get_constant(init_value))
+        gamma_var = mx.sym.var(name = var.name + "_pact_gamma", init=get_constant(init_value))
         quanted_node = mx.sym.contrib.PACT(name=var.name, data=var, gamma=gamma_var, **attrs)
     elif quantize_op_name == "GDRQ":
         init_value = setting.init_value or 1.0

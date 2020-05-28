@@ -119,14 +119,14 @@ def main(config):
                                       lamba=config.kurt_setting["lambda"], 
                                       kT=config.kurt_setting["kT"], 
                                       weight_count=config.kurt_setting["weight_count"])
-        elif config.quantize_flag:
+        if config.quantize_flag:
             assert config.data_type == "float32", "current quantization op only support fp32 mode."
             from core.graph_optimize import attach_quantize_node
             symbol = attach_quantize_node(symbol, out_shape_dictoinary, 
                                         config.quantize_setting["weight"], config.quantize_setting["act"], 
                                         config.quantized_op, config.skip_quantize_counts)
-            # symbol.save("attach_quant.json")
-            # raise NotImplementedError
+        # symbol.save("attach_quant.json")
+        # raise NotImplementedError
         
     # symbol.save(config.network + ".json")
     # raise NotImplementedError
