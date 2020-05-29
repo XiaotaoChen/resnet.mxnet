@@ -315,6 +315,25 @@ def do_kurt(var, shape, lamba, kT, weight_count):
 
     return mx.sym.make_loss(name=var.name+"_loss", data=kurt_loss, grad_scale= lamba / weight_count)
 
+def do_mse(var, shape, lamba, weight_count, nbits, is_perchannel):
+    quant_level = 2**nbits - 1
+    var_abs = mx.sym.abs(var)
+    if is_perchannel == False:
+        max_abs = mx.sym.max(var_abs)
+        quant_unit = max_abs / quant_level
+    else:
+        reduce_axis = tuple([i for i in range(len(shape))])
+        # to avoid the max vaule is zero.
+        max_abs = mx.sym.max(var_abs, axis=reduce_axis[1:]) + 1e-6
+        quant_unit = max_abs / quant_level
+        target_shape = (shape[0],) + (1,) * len(shape[1:])
+        quant_unit = quant_unit.reshape(target_shape).broadcast_like(var)
+    quanted = mx.sym.broadcast_mul(name=var.name+"_bm", 
+                                   lhs=mx.sym.round(mx.sym.broadcast_div(name=var.name+"_bd", lhs=var, rhs=quant_unit)), 
+                                   rhs=quant_unit)
+    mse_loss = mx.sym.mean((var - quanted)**2)*1000
+    return mx.sym.make_loss(name=var.name+"_mse_loss", data=mse_loss, grad_scale=lamba/weight_count)
+
 def attach_kurt_loss(symbol, out_shape_dict, lamba=1.0, kT=1.8, weight_count=1):
     print("kurt loss setting lambda:{}, kT:{}, weight_count:{}".format(lamba, kT, weight_count))
     jgraph = json.loads(symbol.tojson())
@@ -359,6 +378,55 @@ def attach_kurt_loss(symbol, out_shape_dict, lamba=1.0, kT=1.8, weight_count=1):
     # outputs = [node_map[e[0]][e[1]] for e in jgraph["heads"]]
     outputs = outputs[0] if len(outputs) == 1 else mx.sym.Group(outputs)
     return outputs
+
+
+def attach_mse_loss(symbol, out_shape_dict, lamba=1.0, weight_count=1, nbits=4, is_perchannel=True):
+    print("mse loss setting lambda:{}, weight_count:{}, nbits:{}, is_perchannel:{}".format(
+           lamba, weight_count, nbits, is_perchannel))
+    jgraph = json.loads(symbol.tojson())
+    jnodes = jgraph["nodes"]
+    node_map = {}
+    node_op_map = {}
+
+    outputs = []
+
+    for nid, node in enumerate(jnodes):
+        # edges are [which_node, which_output, type(? not sure)]
+        # mx.symbol has an attribute of __getitem__. sym[1] gives the second output
+        children = [node_map[e[0]][e[1]] for e in node["inputs"]]
+        attrs = node.get("attrs", {})
+        node_name = node["name"]
+        op_name = node["op"]
+        if op_name == "null":
+            attrs = dict({k:v for k, v in attrs.items() if k.startswith("__")})
+            node_map[nid] = mx.sym.var(node_name, **attrs)
+            node_op_map[nid] = ["Variable"]
+        else:
+            if op_name.startswith("_contrib_"):
+                op_name = op_name.replace("_contrib_", "")
+                operator = eval("mx.sym.contrib." + op_name)
+            elif op_name.startswith("_"):
+                operator = eval("mx.sym._internal." + op_name)
+            else:
+                operator = eval("mx.sym." + op_name)
+            res = operator(*children, **attrs, name=node_name)
+            node_map[nid] = res
+            node_op_map[nid] = [op_name]
+
+        # attach mse loss
+        for var in children:
+            if var.name.endswith("_weight"):
+                assert var.name in out_shape_dict.keys(), "{} Variable is not in shape_dict".format(var.name)
+                print("attach mse loss for: {}".format(var.name))
+                outputs.append(do_mse(var, shape=out_shape_dict[var.name], lamba=lamba, 
+                               weight_count=weight_count, nbits=nbits, is_perchannel=is_perchannel))
+    for e in jgraph["heads"]:
+        outputs.append(node_map[e[0]][e[1]])
+
+    # outputs = [node_map[e[0]][e[1]] for e in jgraph["heads"]]
+    outputs = outputs[0] if len(outputs) == 1 else mx.sym.Group(outputs)
+    return outputs
+
 
 if __name__ == "__main__":
     sym = mx.sym.load("source.json")

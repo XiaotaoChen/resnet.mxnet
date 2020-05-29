@@ -7,12 +7,12 @@ config = edict()
 config.gpu_list = [0, 1, 2, 3]
 # config.gpu_list = [4, 5, 6, 7]
 config.dataset = "imagenet" # imagenet , cifar10 , cifar100 
-config.network = "resnet" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
-config.depth = 18
+config.network = "resnet50_v1b" # "resnet_cifar10"  # "cifar10_sym"  # "resnet" # "preact_resnet"
+config.depth = 50
 config.model_prefix = config.network + str(config.depth) + '_' + config.dataset
 config.model_load_epoch =90
 config.model_load_prefix = "experiments/resnet18_imagenet_kurtloss_0518/resnet18_imagenet"
-config.retrain = True
+config.retrain = False
 config.allow_missing = True
 
 
@@ -123,9 +123,8 @@ else:
 
 
 # for quantize int8 training
-config.quantize_flag = True
+config.quantize_flag = False
 config.quantize_setting = {
-# for GDRQ
     "weight":{
         "quantize_op_name": "GDRQ_CXX",
         "init_value": 0.5,
@@ -135,45 +134,45 @@ config.quantize_setting = {
             "group_size": "-1",
             "is_weight": "True",
             "lamda": "0.001",
-            "do_quant": "True",
+            "do_quant": "False",
             "ktimes": "3",
             "grad_mode": "ste"
         }
     },
     "act":{
-        "quantize_op_name": "GDRQ_CXX",
-        "init_value": 10,
+        "quantize_op_name": "PACT_CXX",
+        "init_value": 8.0,
         "attrs": {
-            "nbits": "4",
-            "fix_alpha": "False",
-            "group_size": "-1",
-            "is_weight": "False",
-            "lamda": "0.001",
-            "do_quant": "True",
-            "ktimes": "3",
-            "grad_mode": "clip"
+            "nbits": "4"
         }
     }
+
 }
 
 # reset
 weight_count_map = {18:22, 50:54}
 
-config.kurtloss = True
+config.kurtloss = False
 config.kurt_setting={
     "weight_count": weight_count_map[config.depth],
     "lambda":1,
-    "kT":1.8
+    "kT":3.0
 }
-if config.kurtloss:
-    config.quantize_flag = False
+
+config.mseloss = False
+config.mse_setting={
+    "weight_count": weight_count_map[config.depth],
+    "lambda":1,
+    "nbits":4,
+    "is_perchannel": True
+}
 
 # config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution","Concat", "Pooling", "add_n", "elemwise_add"]
 config.quantized_op = ["Convolution", "FullyConnected", "Deconvolution"]
-config.skip_quantize_counts = {"Convolution": 0, "FullyConnected": 0}
+config.skip_quantize_counts = {"Convolution": 1, "FullyConnected": 1}
 
-config.output_dir = "{}_kurtlossft_150_0526".format(config.model_prefix)
+config.output_dir = "{}_tmp".format(config.model_prefix)
 
-if config.quantize_flag or config.kurtloss:
-    config.lr_step = [40, 80, 110]
-    config.num_epoch = 150
+# if config.quantize_flag or config.kurtloss:
+#     config.lr_step = [40, 80, 110]
+#     config.num_epoch = 150

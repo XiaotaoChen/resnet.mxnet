@@ -107,8 +107,11 @@ def main(config):
         symbol = eval(config.network)(num_classes=config.num_classes)
     elif config.network == "cifar10_sym":
         symbol = eval(config.network)()
+    elif config.network == "resnet50_v1b":
+        symbol = eval(config.network)(num_classes=config.num_classes)
+
     
-    if config.quantize_flag or config.kurtloss:
+    if config.quantize_flag or config.kurtloss or config.mseloss:
         worker_data_shape = dict(data_shapes + label_shapes)
         _, out_shape, _ = symbol.get_internals().infer_shape(**worker_data_shape)
         out_shape_dictoinary = dict(zip(symbol.get_internals().list_outputs(), out_shape))
@@ -119,17 +122,25 @@ def main(config):
                                       lamba=config.kurt_setting["lambda"], 
                                       kT=config.kurt_setting["kT"], 
                                       weight_count=config.kurt_setting["weight_count"])
+        elif config.mseloss:
+            from core.graph_optimize import attach_mse_loss
+            symbol = attach_mse_loss(symbol, out_shape_dict=out_shape_dictoinary, 
+                                      lamba=config.mse_setting["lambda"], 
+                                      weight_count=config.mse_setting["weight_count"],
+                                      nbits=config.mse_setting["nbits"],
+                                      is_perchannel=config.mse_setting["is_perchannel"])
         if config.quantize_flag:
             assert config.data_type == "float32", "current quantization op only support fp32 mode."
             from core.graph_optimize import attach_quantize_node
             symbol = attach_quantize_node(symbol, out_shape_dictoinary, 
                                         config.quantize_setting["weight"], config.quantize_setting["act"], 
                                         config.quantized_op, config.skip_quantize_counts)
+
         # symbol.save("attach_quant.json")
         # raise NotImplementedError
         
-    # symbol.save(config.network + ".json")
-    # raise NotImplementedError
+    symbol.save(config.network + ".json")
+    raise NotImplementedError
     # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
 
     # memonger
