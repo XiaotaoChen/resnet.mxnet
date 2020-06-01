@@ -139,8 +139,8 @@ def main(config):
         # symbol.save("attach_quant.json")
         # raise NotImplementedError
         
-    symbol.save(config.network + ".json")
-    raise NotImplementedError
+    # symbol.save(config.network + ".json")
+    # raise NotImplementedError
     # mx.viz.print_summary(symbol, {'data': (1, 3, 224, 224)})
 
     # memonger

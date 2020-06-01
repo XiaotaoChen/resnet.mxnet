@@ -163,7 +163,7 @@ def create_quant_node(var, setting):
     quantize_op_name = setting.quantize_op_name
     attrs = setting.attrs
     assert quantize_op_name in ("Quantization_int8", "QIL", "DoReFa_PY", "DoReFa_CXX", "PACT", "PACT_CXX", 
-                                "WNQ", "GDRQ", "GDRQ_CXX", "Quantization_int8_PY")
+                                "WNQ", "GDRQ", "GDRQ_CXX", "Quantization_int8_PY", "Mseloss")
 
     if quantize_op_name == "Quantization_int8":
         init_value = setting.init_value or 0
@@ -200,6 +200,8 @@ def create_quant_node(var, setting):
         init_value = setting.init_value or 1.0
         alpha_var = mx.sym.Variable(name=var.name + "_alpha", init=mx.init.Constant(init_value), dtype="float32")
         quanted_node = mx.sym.contrib.GDRQ(name=var.name, data=var, alpha=alpha_var, **attrs)
+    elif quantize_op_name == "Mseloss":
+        quanted_node = mx.sym.contrib.Mseloss(name=var.name, data=var, **attrs)
     return quanted_node
 
 def attach_quantize_node(symbol, out_shape_dict, weight_setting, act_setting, 

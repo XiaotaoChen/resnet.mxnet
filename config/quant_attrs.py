@@ -80,4 +80,14 @@ PACT
         }
     }
 
+Mseloss
+==============================
+    "weight":{
+        "quantize_op_name": "Mseloss",
+        "attrs": {
+            "nbits": "4",
+            "gamma": "1"
+        }
+    }
+
 """
