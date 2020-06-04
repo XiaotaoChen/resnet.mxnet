@@ -1,4 +1,5 @@
 #!/bin/bash
+eval $(cd && .tspkg/bin/tsp --env)
 
 workspace="/root/resnet.mxnet"
 

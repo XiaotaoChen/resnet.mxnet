@@ -22,6 +22,8 @@ if [ ! -f "${hostfile}" ]; then
     exit
 fi
 
+echo "*********** to launch ${num_proc} process **********"
+
 /root/3rdparty/openmpi4.0/bin/mpirun -np ${num_proc} \
     --allow-run-as-root \
     --npernode 8 \
