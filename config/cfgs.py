@@ -44,3 +44,40 @@ if dataset == "imagenet":
         filter_list = [64, 64, 128, 256, 512]
         bottle_neck = False
     num_stage = 4
+
+# quantization setting
+quant_begin_epoch = num_epoch
+quant_end_epoch = quant_begin_epoch + 2
+quant_lr = lr / 10
+quantized_op = ("Convolution", "FullyConnected", "Deconvolution",)
+skip_quantize_counts = {} # {"Convolution": 0, "FullyConnected":0}
+quantize_counts = {} # {"Convolution": 1000, "FullyConnected":1000}
+
+weight_setting = {
+    "quantize_op_name": "Quantization_int8",
+    "init_value": None,
+    "attrs": {
+        "nbits": 7,
+        "delay_quant": 0,
+        "ema_decay": 0.99,
+        "grad_mode": "ste",
+        "is_weight": True,
+        "is_weight_perchannel": True,
+        "fix_act_scale": False,
+        "quant_mode": "minmax",
+    },
+}
+act_setting = {
+    "quantize_op_name": "Quantization_int8",
+    "init_value": None,
+    "attrs": {
+        "nbits": 7,
+        "delay_quant": 0,
+        "ema_decay": 0.99,
+        "grad_mode": "ste",
+        "is_weight": False,
+        "is_weight_perchannel": False,
+        "fix_act_scale": False,
+        "quant_mode": "minmax",
+    },
+}
