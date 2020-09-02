@@ -40,8 +40,8 @@ def main(config):
     train, val, num_examples = imagenet_iterator(data_dir=config.data_dir,
                                                  batch_size=config.batch_size,
                                                  kv=kv)
-    print train
-    print val
+    print(train)
+    print(val)
     data_names = ('data',)
     label_names = ('softmax_label',)
     data_shapes = [('data', (config.batch_size, 3, 224, 224))]

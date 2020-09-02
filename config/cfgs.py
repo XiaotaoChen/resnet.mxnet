@@ -2,16 +2,16 @@
 mxnet_path = '../incubator-mxnet/python/'
 gpu_list = [0, 1, 2, 3]
 dataset = "imagenet"
-model_prefix = "resnext50"
-network = "resnext"
-depth = 50
+model_prefix = "resnet18"
+network = "resnet"
+depth = 18
 model_load_prefix = model_prefix
 model_load_epoch = 0
 retrain = False
 
 # data
-data_dir = '/home/hzh/imagenet_data_new/'
-batch_size = 32
+data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/imagenet/imagenet_data_new'
+batch_size = 64
 batch_size *= len(gpu_list)
 kv_store = 'device'
 

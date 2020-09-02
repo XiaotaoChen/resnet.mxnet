@@ -1,1 +1,1 @@
-from imagenet import imagenet_iterator
+from .imagenet import imagenet_iterator

@@ -1,2 +1,2 @@
-from resnet import resnet
-from resnext import resnext
+from .resnet import resnet
+from .resnext import resnext
