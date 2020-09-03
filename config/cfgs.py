@@ -1,6 +1,8 @@
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 mxnet_path = '../incubator-mxnet/python/'
-gpu_list = [0, 1, 2, 3]
+# gpu_list = [0, 1, 2, 3]
+gpu_list = [4, 5, 6, 7]
+
 dataset = "imagenet"
 model_prefix = "resnet18"
 network = "resnet"

@@ -60,7 +60,7 @@ def main(config):
 
     # attach quantized node
     sym, arg_params, aux_params = mx.model.load_checkpoint("model/{}".format(config.model_load_prefix),
-                                                             config.model_load_epoch)
+                                                             config.quant_begin_epoch)
     worker_data_shape = {"data":(1, 3, 224, 224)}
     _, out_shape, _ = sym.get_internals().infer_shape(**worker_data_shape)
     out_shape_dictoinary = dict(zip(sym.get_internals().list_outputs(), out_shape))
@@ -68,14 +68,14 @@ def main(config):
     sym = attach_quantize_node(sym, out_shape_dictoinary, config.weight_setting, config.act_setting, 
                                quantized_op=config.quantized_op, skip_quantize_counts=config.skip_quantize_counts,
                                quantize_counts=config.quantize_counts,)
-    # sym.save("quant_sym.json")
+    sym.save(os.path.join(model_dir, "quant_sym.json"))
     # raise NotImplementedError
 
 
     epoch_size = max(int(num_examples / config.batch_size / kv.num_workers), 1)
     # int8 training 
     base_lr = config.quant_lr
-    lr_scheduler = SineScheduler(config.quant_lr, config.quant_epoch * epoch_size)
+    lr_scheduler = SineScheduler(config.quant_lr, (config.quant_end_epoch - config.quant_begin_epoch) * epoch_size)
 
     optimizer_params = {'learning_rate': base_lr,
                         'lr_scheduler': lr_scheduler,
@@ -87,7 +87,7 @@ def main(config):
     if config.dataset == "imagenet":
         eval_metric.append(mx.metric.create('top_k_accuracy', top_k=5))
 
-    solver = Solver(symbol=symbol,
+    solver = Solver(symbol=sym,
                     data_names=data_names,
                     label_names=label_names,
                     data_shapes=data_shapes,
@@ -110,7 +110,8 @@ def main(config):
                optimizer_params=optimizer_params,
                begin_epoch=config.quant_begin_epoch,
                num_epoch=config.quant_end_epoch,
-               kvstore=kv)
+               kvstore=kv,
+               allow_missing=True,)
 
 
 if __name__ == '__main__':

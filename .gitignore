@@ -102,3 +102,6 @@ ENV/
 
 # model
 model/
+
+# vscode
+.vscode/
