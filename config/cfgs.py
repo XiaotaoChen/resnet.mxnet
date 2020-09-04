@@ -1,7 +1,7 @@
 # mxnet version: https://github.com/huangzehao/incubator-mxnet-bk
 mxnet_path = '../incubator-mxnet/python/'
-# gpu_list = [0, 1, 2, 3]
-gpu_list = [4, 5, 6, 7]
+gpu_list = [0, 1, 2, 3]
+# gpu_list = [4, 5, 6, 7]
 
 dataset = "imagenet"
 model_prefix = "resnet18"
@@ -22,12 +22,12 @@ lr = 0.1
 wd = 0.0001
 momentum = 0.9
 if dataset == "imagenet":
-    lr_step = [30, 60, 90]
+    lr_step = [30, 60, 80]
 else:
     lr_step = [120, 160, 240]
 lr_factor = 0.1
 begin_epoch = model_load_epoch if retrain else 0
-num_epoch = 100
+num_epoch = 90
 frequent = 50
 
 # network config
@@ -48,7 +48,7 @@ if dataset == "imagenet":
     num_stage = 4
 
 # quantization setting
-quant_begin_epoch = num_epoch
+quant_begin_epoch = 50 # num_epoch
 quant_end_epoch = quant_begin_epoch + 2
 quant_lr = lr / 10
 quantized_op = ("Convolution", "FullyConnected", "Deconvolution",)

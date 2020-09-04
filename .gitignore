@@ -105,3 +105,6 @@ model/
 
 # vscode
 .vscode/
+
+# log
+log/

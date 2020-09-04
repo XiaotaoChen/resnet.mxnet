@@ -69,8 +69,8 @@ def main(config):
                         'lr_scheduler': lr_scheduler,
                         'wd': config.wd,
                         'momentum': config.momentum}
-    optimizer = "nag"
-    #optimizer = 'sgd'
+    # optimizer = "nag"
+    optimizer = 'sgd'
     eval_metric = ['acc']
     if config.dataset == "imagenet":
         eval_metric.append(mx.metric.create('top_k_accuracy', top_k=5))

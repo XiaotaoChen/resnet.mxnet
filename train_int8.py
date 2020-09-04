@@ -61,7 +61,7 @@ def main(config):
     # attach quantized node
     sym, arg_params, aux_params = mx.model.load_checkpoint("model/{}".format(config.model_load_prefix),
                                                              config.quant_begin_epoch)
-    worker_data_shape = {"data":(1, 3, 224, 224)}
+    worker_data_shape = {"data":(config.batch_size, 3, 224, 224)}
     _, out_shape, _ = sym.get_internals().infer_shape(**worker_data_shape)
     out_shape_dictoinary = dict(zip(sym.get_internals().list_outputs(), out_shape))
 
