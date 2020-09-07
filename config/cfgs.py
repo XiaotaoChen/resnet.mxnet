@@ -48,7 +48,7 @@ if dataset == "imagenet":
     num_stage = 4
 
 # quantization setting
-quant_begin_epoch = 50 # num_epoch
+quant_begin_epoch = num_epoch
 quant_end_epoch = quant_begin_epoch + 2
 quant_lr = lr / 10
 quantized_op = ("Convolution", "FullyConnected", "Deconvolution",)
