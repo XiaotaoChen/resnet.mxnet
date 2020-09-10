@@ -16,6 +16,7 @@ data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/imagenet/imagenet_data_new
 batch_size = 64
 batch_size *= len(gpu_list)
 kv_store = 'device'
+data_type = "fp16"
 
 # optimizer
 lr = 0.1
