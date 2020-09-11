@@ -7,6 +7,7 @@ sys.path.insert(0, config.mxnet_path)
 import mxnet as mx
 from core.scheduler import multi_factor_scheduler
 from core.solver import Solver
+from core import callback
 from data import *
 from symbol import *
 
@@ -83,11 +84,13 @@ def main(config):
                     logger=logging,
                     context=devs)
     epoch_end_callback = mx.callback.do_checkpoint("./model/" + config.model_prefix)
-    batch_end_callback = mx.callback.Speedometer(config.batch_size, config.frequent)
+    batch_end_callback = callback.Speedometer(config.batch_size, config.frequent)
+
     initializer = mx.init.Xavier(rnd_type='gaussian', factor_type='in', magnitude=2)
     arg_params = None
     aux_params = None
     if config.retrain:
+        print("pretrain model: {}, epoch: {}".format(config.model_load_prefix, config.model_load_epoch))
         _, arg_params, aux_params = mx.model.load_checkpoint("model/{}".format(config.model_load_prefix),
                                                              config.model_load_epoch)
     solver.fit(train_data=train,

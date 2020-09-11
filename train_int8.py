@@ -7,6 +7,7 @@ sys.path.insert(0, config.mxnet_path)
 import mxnet as mx
 from core.scheduler import multi_factor_scheduler
 from core.solver import Solver
+from core import callback
 from data import *
 from symbol import *
 
@@ -30,13 +31,13 @@ def main(config):
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
     # model folder
-    model_dir = "./model"
+    model_dir = os.path.dirname(config.quant_prefix)
     # quantized model dir
-    quantize_str = "w_{}{}_act_{}{}_{}e_{}e".format(config.weight_setting["quantize_op_name"],
+    quantize_str = "w_{}{}_act_{}{}_{}e_{}e_{}".format(config.weight_setting["quantize_op_name"],
                                                 config.weight_setting["attrs"]["nbits"],
                                                 config.act_setting["quantize_op_name"],
                                                 config.act_setting["attrs"]["nbits"],
-                                                config.quant_begin_epoch, config.quant_end_epoch)
+                                                config.quant_begin_epoch, config.quant_end_epoch, config.data_type)
     model_dir = os.path.join(model_dir, quantize_str)
 
     if not os.path.exists(model_dir):
@@ -59,15 +60,21 @@ def main(config):
     label_shapes = [('softmax_label', (config.batch_size,))]
 
     # attach quantized node
-    sym, arg_params, aux_params = mx.model.load_checkpoint("model/{}".format(config.model_load_prefix),
+    sym, arg_params, aux_params = mx.model.load_checkpoint(config.quant_prefix,
                                                              config.quant_begin_epoch)
-    worker_data_shape = {"data":(config.batch_size, 3, 224, 224)}
-    _, out_shape, _ = sym.get_internals().infer_shape(**worker_data_shape)
-    out_shape_dictoinary = dict(zip(sym.get_internals().list_outputs(), out_shape))
 
-    sym = attach_quantize_node(sym, out_shape_dictoinary, config.weight_setting, config.act_setting, 
+    worker_data_shape = {"data":(config.batch_size, 3, 224, 224)}
+    # arg shape, out shape, aux shape
+    _, out_shape, _ = sym.get_internals().infer_shape(**worker_data_shape)
+    out_shape_dictionary = dict(zip(sym.get_internals().list_outputs(), out_shape))
+
+    worker_data_type = {"data": "float32"}
+    _, out_type, _ = sym.get_internals().infer_type(**worker_data_type)
+    out_type_dictionary = dict(zip(sym.get_internals().list_outputs(), out_type))
+
+    sym = attach_quantize_node(sym, out_shape_dictionary, config.weight_setting, config.act_setting, 
                                quantized_op=config.quantized_op, skip_quantize_counts=config.skip_quantize_counts,
-                               quantize_counts=config.quantize_counts,)
+                               quantize_counts=config.quantize_counts, out_type_dict=out_type_dictionary)
     sym.save(os.path.join(model_dir, "quant_sym.json"))
     # raise NotImplementedError
 
@@ -95,7 +102,7 @@ def main(config):
                     logger=logging,
                     context=devs)
     epoch_end_callback = mx.callback.do_checkpoint(os.path.join(model_dir, config.model_prefix))
-    batch_end_callback = mx.callback.Speedometer(config.batch_size, config.frequent)
+    batch_end_callback = callback.Speedometer(config.batch_size, config.frequent)
     initializer = mx.init.Xavier(rnd_type='gaussian', factor_type='in', magnitude=2)
 
     solver.fit(train_data=train,

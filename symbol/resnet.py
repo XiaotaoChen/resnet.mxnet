@@ -54,14 +54,15 @@ def residual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True,
         return conv2 + shortcut
 
 
-def resnet(units, num_stage, filter_list, num_classes, data_type="fp32", bottle_neck=True,
+def resnet(units, num_stage, filter_list, num_classes, data_type="float32", bottle_neck=True,
            bn_mom=0.9, workspace=512, memonger=False):
     num_unit = len(units)
     assert (num_unit == num_stage)
+    assert data_type in ("float32", "float16",), "data type {} not in ('float32', 'float16')".format(data_type)
 
     data = mx.sym.Variable(name='data')
 
-    if data_type == "fp16":
+    if data_type == "float16":
         data = mx.sym.Cast(data=data, name = data.name + "_f16", dtype="float16")
 
     body = mx.sym.Convolution(data=data, num_filter=filter_list[0], kernel=(7, 7), stride=(2, 2), pad=(3, 3),
@@ -82,7 +83,7 @@ def resnet(units, num_stage, filter_list, num_classes, data_type="fp32", bottle_
     pool1 = mx.symbol.Pooling(data=relu1, global_pool=True, kernel=(7, 7), pool_type='avg', name='pool1')
     flat = mx.symbol.Flatten(data=pool1)
     fc1 = mx.symbol.FullyConnected(data=flat, num_hidden=num_classes, name='fc1')
-    if data_type == "fp16":
+    if data_type == "float16":
         fc1 = mx.sym.Cast(data=fc1, name = fc1.name + "_fp32", dtype="float32")
     cls = mx.symbol.SoftmaxOutput(data=fc1, name='softmax')
     return cls

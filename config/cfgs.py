@@ -16,7 +16,7 @@ data_dir = '/mnt/truenas/scratch/xiaotao.chen/dataset/imagenet/imagenet_data_new
 batch_size = 64
 batch_size *= len(gpu_list)
 kv_store = 'device'
-data_type = "fp16"
+data_type = "float32"
 
 # optimizer
 lr = 0.1
@@ -49,9 +49,11 @@ if dataset == "imagenet":
     num_stage = 4
 
 # quantization setting
+quant_prefix = "model/fp16_pretrain/resnet18_fp16"
+# quant_prefix = "model/resnet18"
 quant_begin_epoch = num_epoch
 quant_end_epoch = quant_begin_epoch + 2
-quant_lr = lr / 10
+quant_lr = lr / 100
 quantized_op = ("Convolution", "FullyConnected", "Deconvolution",)
 skip_quantize_counts = {} # {"Convolution": 0, "FullyConnected":0}
 quantize_counts = {} # {"Convolution": 1000, "FullyConnected":1000}

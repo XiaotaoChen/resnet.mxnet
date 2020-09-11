@@ -87,6 +87,7 @@ class Solver(object):
                 self.module.update_metric(eval_metric, data_batch.label)
 
                 if batch_end_callback is not None:
+                    current_lr = self.module._optimizer.learning_rate
                     batch_end_params = BatchEndParam(epoch=epoch, nbatch=nbatch,
                                                      eval_metric=eval_metric,
                                                      locals=locals())
